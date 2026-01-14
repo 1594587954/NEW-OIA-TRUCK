@@ -122,7 +122,7 @@
             Button, Table, Modal, Form, Input, InputNumber, 
             Select, Tabs, Card, Space, message, Popconfirm, 
             Typography, List, Descriptions, Divider, Tag, Empty,
-            ConfigProvider, DatePicker
+            ConfigProvider, DatePicker, AutoComplete
         } = antd;
         const { Title, Text } = Typography;
 
@@ -253,7 +253,8 @@
         const DB_KEYS = {
             ADDRESSES: 'dispatch_addresses',
             ROUTES: 'dispatch_routes',
-            ORDERS: 'dispatch_orders'
+            ORDERS: 'dispatch_orders',
+            FLEETS: 'dispatch_fleets'
         };
 
         const getAddresses = () => {
@@ -262,6 +263,13 @@
             } catch (e) { return []; }
         };
         const saveAddresses = (data) => localStorage.setItem(DB_KEYS.ADDRESSES, JSON.stringify(data));
+
+        const getFleets = () => {
+            try {
+                return JSON.parse(localStorage.getItem(DB_KEYS.FLEETS) || '[]');
+            } catch (e) { return []; }
+        };
+        const saveFleets = (data) => localStorage.setItem(DB_KEYS.FLEETS, JSON.stringify(data));
 
         const getRoutes = () => {
             try {
@@ -285,6 +293,12 @@
             const [selectedRoute, setSelectedRoute] = useState(null);
             const [currentStops, setCurrentStops] = useState([]);
             const [printData, setPrintData] = useState(null);
+            const [fleets, setFleets] = useState([]);
+
+            // 加载车队历史记录
+            useEffect(() => {
+                setFleets(getFleets());
+            }, []);
 
             // 监听编辑状态
             useEffect(() => {
@@ -374,9 +388,25 @@
                 message.success('已重置');
             };
 
+            const handleDeleteFleet = (fleetValue) => {
+                const newFleets = fleets.filter(f => f.value !== fleetValue);
+                setFleets(newFleets);
+                saveFleets(newFleets);
+                message.success('已删除车队记录');
+            };
+
             const handleGenerate = () => {
                 form.validateFields().then(values => {
                     const routeName = selectedRoute?.name || '';
+                    
+                    // --- 保存新车队 ---
+                    const newFleet = values.fleet;
+                    if (newFleet && !fleets.some(f => f.value === newFleet)) {
+                        const updatedFleets = [...fleets, { value: newFleet }];
+                        setFleets(updatedFleets);
+                        saveFleets(updatedFleets);
+                    }
+
                     const data = {
                         ...values,
                         stops: currentStops,
@@ -507,7 +537,41 @@
                                         style={{ marginBottom: 0 }}
                                         rules={[{ required: true, message: '请输入承运车队' }]}
                                     >
-                                        <Input size="large" variant="filled" placeholder="请输入车队名称" />
+                                        <AutoComplete
+                                            options={fleets.map(f => ({
+                                                value: f.value,
+                                                label: (
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <span>{f.value}</span>
+                                                        <span 
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                e.preventDefault();
+                                                                handleDeleteFleet(f.value);
+                                                            }}
+                                                            style={{ 
+                                                                color: '#999', 
+                                                                cursor: 'pointer', 
+                                                                padding: '0 8px',
+                                                                fontSize: '16px',
+                                                                fontWeight: 'bold'
+                                                            }}
+                                                            title="删除此记录"
+                                                            onMouseEnter={(e) => e.target.style.color = '#ff4d4f'}
+                                                            onMouseLeave={(e) => e.target.style.color = '#999'}
+                                                        >
+                                                            ×
+                                                        </span>
+                                                    </div>
+                                                )
+                                            }))}
+                                            filterOption={(inputValue, option) =>
+                                                option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+                                            }
+                                            size="large"
+                                            variant="filled"
+                                            placeholder="输入或选择车队"
+                                        />
                                     </Form.Item>
                                 </div>
 
