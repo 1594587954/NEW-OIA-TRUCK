@@ -329,7 +329,11 @@
                     }
 
                     // 恢复站点
-                    setCurrentStops(editingOrder.stops || []);
+                    setCurrentStops((editingOrder.stops || []).map((s, i) => ({
+                        key: Date.now() + i,
+                        addressId: s.addressId,
+                        type: s.type || (i === 0 ? 'pickup' : (i === (editingOrder.stops || []).length - 1 ? 'delivery' : 'logistics'))
+                    })));
                     message.info('已加载订单数据，修改后点击“保存并重新生成”即可更新');
                 }
             }, [editingOrder, form, routes]);
@@ -338,7 +342,11 @@
                 const route = routes.find(r => r.id === routeId);
                 if (route) {
                     setSelectedRoute(route);
-                    setCurrentStops(route.stops.map((s, i) => ({ key: Date.now() + i, addressId: s.addressId })));
+                    setCurrentStops(route.stops.map((s, i) => ({ 
+                        key: Date.now() + i, 
+                        addressId: s.addressId,
+                        type: s.type || (i === 0 ? 'pickup' : (i === route.stops.length - 1 ? 'delivery' : 'logistics'))
+                    })));
                     
                     // 自动填充表单
                     form.setFieldsValue({
@@ -353,7 +361,10 @@
             };
 
             const handleAddStop = () => {
-                setCurrentStops([...currentStops, { key: Date.now(), addressId: null }]);
+                let defaultType = 'logistics';
+                if (currentStops.length === 0) defaultType = 'pickup';
+                else defaultType = 'delivery';
+                setCurrentStops([...currentStops, { key: Date.now(), addressId: null, type: defaultType }]);
             };
 
             const handleRemoveStop = (index) => {
@@ -362,20 +373,36 @@
                 setCurrentStops(newStops);
             };
 
+            const handleStopTypeChange = (index, val) => {
+                const newStops = [...currentStops];
+                newStops[index].type = val;
+                setCurrentStops(newStops);
+            };
+
             const handleStopChange = (index, value) => {
                 const newStops = [...currentStops];
                 newStops[index].addressId = value;
-                setCurrentStops(newStops);
-
+                
                 const addr = addresses.find(a => a.id === value);
-                if (addr && addr.note) {
-                    const currentNote = form.getFieldValue('note') || '';
-                    if (!currentNote.includes(addr.note)) {
-                        const newNote = currentNote ? `${currentNote}\n${addr.note}` : addr.note;
-                        form.setFieldsValue({ note: newNote });
-                        message.info(`已自动添加地址备注: ${addr.note}`);
+                if (addr) {
+                    // 智能识别物流园/仓库
+                    const keywords = ['物流园', '物流中心', '保税仓', '仓库', '仓储', '堆场', 'Park', 'Logistics', 'Warehouse', 'Bonded', 'Depot'];
+                    const text = ((addr.name || '') + (addr.location || '')).toLowerCase();
+                    if (keywords.some(k => text.includes(k.toLowerCase()))) {
+                        newStops[index].type = 'logistics';
+                        message.success(`已自动识别为物流园: ${addr.name}`);
+                    }
+
+                    if (addr.note) {
+                        const currentNote = form.getFieldValue('note') || '';
+                        if (!currentNote.includes(addr.note)) {
+                            const newNote = currentNote ? `${currentNote}\n${addr.note}` : addr.note;
+                            form.setFieldsValue({ note: newNote });
+                            message.info(`已自动添加地址备注: ${addr.note}`);
+                        }
                     }
                 }
+                setCurrentStops(newStops);
             };
 
             const getAddressDetails = (addressId) => addresses.find(a => a.id === addressId) || {};
@@ -409,7 +436,10 @@
 
                     const data = {
                         ...values,
-                        stops: currentStops,
+                        stops: currentStops.map(s => ({
+                            addressId: s.addressId,
+                            type: s.type || 'logistics'
+                        })),
                         routeName: routeName
                     };
                     setPrintData(data);
@@ -623,13 +653,26 @@
                                                     {index + 1}
                                                 </div>
                                                 <div style={{ flex: 1 }}>
-                                                    <Select
-                                                        showSearch
+                                                    <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                                                        <Select
+                                                            value={stop.type}
+                                                            onChange={(val) => handleStopTypeChange(index, val)}
+                                                            style={{ width: 110, flexShrink: 0 }}
+                                                            size="large"
+                                                            variant="filled"
+                                                            options={[
+                                                                { label: '📤 提货', value: 'pickup' },
+                                                                { label: '📥 送货', value: 'delivery' },
+                                                                { label: '🏢 物流园', value: 'logistics' }
+                                                            ]}
+                                                        />
+                                                        <Select
+                                                            showSearch
                                                         placeholder="请选择地址..."
                                                         optionFilterProp="children"
                                                         value={stop.addressId}
                                                         onChange={(val) => handleStopChange(index, val)}
-                                                        style={{ width: '100%' }}
+                                                        style={{ flex: 1 }}
                                                         size="large"
                                                         variant="filled"
                                                     >
@@ -639,6 +682,7 @@
                                                             </Select.Option>
                                                         ))}
                                                     </Select>
+                                                    </div>
                                                     {stop.addressId && (
                                                         <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>
                                                             {(() => {
@@ -868,7 +912,12 @@
             useEffect(() => {
                 if (editingRoute) {
                     form.setFieldsValue({ routeName: editingRoute.name });
-                    setStops(editingRoute.stops.map((s, i) => ({ key: Date.now() + i, addressId: s.addressId })));
+                    setStops(editingRoute.stops.map((s, i) => ({ 
+                        key: Date.now() + i, 
+                        addressId: s.addressId,
+                        // 兼容旧数据：如果有type用type，没有则根据位置推断
+                        type: s.type || (i === 0 ? 'pickup' : (i === editingRoute.stops.length - 1 ? 'delivery' : 'logistics'))
+                    })));
                     setCargoInfo(editingRoute.cargo || { description: '', count: 0, cbm: 0, weight: 0, note: '' });
                 }
             }, [editingRoute]);
@@ -882,7 +931,13 @@
             };
 
             const handleAddStop = () => {
-                setStops([...stops, { key: Date.now(), addressId: null }]);
+                // 智能默认类型：如果列表为空，默认提货；如果已有站点，新加的默认送货（假设是在最后）
+                // 用户可以手动修改
+                let defaultType = 'logistics';
+                if (stops.length === 0) defaultType = 'pickup';
+                else defaultType = 'delivery';
+
+                setStops([...stops, { key: Date.now(), addressId: null, type: defaultType }]);
             };
 
             const handleRemoveStop = (index) => {
@@ -891,22 +946,38 @@
                 setStops(newStops);
             };
 
+            const handleStopTypeChange = (index, val) => {
+                const newStops = [...stops];
+                newStops[index].type = val;
+                setStops(newStops);
+            };
+
             const handleStopChange = (index, value) => {
                 const newStops = [...stops];
                 newStops[index].addressId = value;
-                setStops(newStops);
-
+                
                 // 自动填充逻辑：获取选中地址的备注，并追加到货物备注中
                 const addr = addresses.find(a => a.id === value);
-                if (addr && addr.note) {
-                    // 检查当前备注是否已包含该地址备注，避免重复添加
-                    const currentNote = cargoInfo.note || '';
-                    if (!currentNote.includes(addr.note)) {
-                        const newNote = currentNote ? `${currentNote}\n${addr.note}` : addr.note;
-                        setCargoInfo(prev => ({ ...prev, note: newNote }));
-                        message.info(`已自动添加地址备注: ${addr.note}`);
+                if (addr) {
+                    // 智能识别物流园/仓库
+                    const keywords = ['物流园', '物流中心', '保税仓', '仓库', '仓储', '堆场', 'Park', 'Logistics', 'Warehouse', 'Bonded', 'Depot'];
+                    const text = ((addr.name || '') + (addr.location || '')).toLowerCase();
+                    if (keywords.some(k => text.includes(k.toLowerCase()))) {
+                        newStops[index].type = 'logistics';
+                        message.success(`已自动识别为物流园: ${addr.name}`);
+                    }
+
+                    if (addr.note) {
+                        // 检查当前备注是否已包含该地址备注，避免重复添加
+                        const currentNote = cargoInfo.note || '';
+                        if (!currentNote.includes(addr.note)) {
+                            const newNote = currentNote ? `${currentNote}\n${addr.note}` : addr.note;
+                            setCargoInfo(prev => ({ ...prev, note: newNote }));
+                            message.info(`已自动添加地址备注: ${addr.note}`);
+                        }
                     }
                 }
+                setStops(newStops);
             };
 
             const handleSaveRoute = () => {
@@ -925,9 +996,10 @@
                     const routeData = {
                         id: editingRoute ? editingRoute.id : Date.now().toString(),
                         name: values.routeName,
-                        // 新的数据结构：站点只包含地址ID
+                        // 新的数据结构：站点包含地址ID和类型
                         stops: stops.map(s => ({
-                            addressId: s.addressId
+                            addressId: s.addressId,
+                            type: s.type || 'logistics'
                         })),
                         // 全局货物信息
                         cargo: { ...cargoInfo },
@@ -997,6 +1069,18 @@
                                     <div style={{ backgroundColor: '#2563eb', color: 'white', borderRadius: 9999, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', flexShrink: 0 }}>
                                         {index + 1}
                                     </div>
+                                    <Select
+                                        value={stop.type}
+                                        onChange={(val) => handleStopTypeChange(index, val)}
+                                        style={{ width: 110, flexShrink: 0 }}
+                                        size="large"
+                                        variant="filled"
+                                        options={[
+                                            { label: '📤 提货', value: 'pickup' },
+                                            { label: '📥 送货', value: 'delivery' },
+                                            { label: '🏢 物流园', value: 'logistics' }
+                                        ]}
+                                    />
                                     <Select 
                                         showSearch
                                         placeholder="搜索地址库（支持名称/地址模糊搜索）..."
@@ -1005,7 +1089,7 @@
                                         }
                                         value={stop.addressId}
                                         onChange={(val) => handleStopChange(index, val)}
-                                        style={{ width: '100%', fontWeight: 500 }}
+                                        style={{ flex: 1, fontWeight: 500 }}
                                         size="large"
                                         variant="borderless"
                                         status={!stop.addressId ? 'warning' : ''}
@@ -1217,9 +1301,17 @@
                                     key: 'address',
                                     render: (_, stop) => {
                                         const addr = getAddressDetails(stop.addressId);
+                                        const typeMap = { pickup: '提货', delivery: '送货', logistics: '物流园' };
+                                        const typeColor = { pickup: 'blue', delivery: 'green', logistics: 'orange' };
+                                        
                                         return (
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <span>{addr.name || '已删除地址'} <Text type="secondary" style={{fontSize: 12}}>({addr.location})</Text></span>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    {stop.type && (
+                                                        <Tag color={typeColor[stop.type]}>{typeMap[stop.type]}</Tag>
+                                                    )}
+                                                    <span>{addr.name || '已删除地址'} <Text type="secondary" style={{fontSize: 12}}>({addr.location})</Text></span>
+                                                </div>
                                                 <span>
                                                     <Tag>{addr.contactPerson}</Tag>
                                                     {addr.contactInfo}
@@ -1324,31 +1416,145 @@
 
                 const selectedOrders = orders.filter(o => selectedRowKeys.includes(o.id));
                 
-                // 准备导出数据
-                const exportData = selectedOrders.map(o => ({
-                    'Shipment ID': o.shipmentId,
-                    'PO 号码': o.poNumber,
-                    '路线名称': o.routeName,
-                    '承运车队': o.fleet,
-                    '车型': o.vehicleType,
-                    '提货日期': o.pickupDate ? dayjs(o.pickupDate).format('YYYY-MM-DD') : '',
-                    '送货日期': o.deliveryDate ? dayjs(o.deliveryDate).format('YYYY-MM-DD') : '',
-                    '货物描述': o.cargoDescription,
-                    '件数': o.cargoCount,
-                    '体积(CBM)': o.cargoCbm,
-                    '重量(KG)': o.cargoWeight,
-                    '备注': o.note
-                }));
+                // HTML 导出方式 (去除样式)
+                let tableHTML = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><\/head><body>';
+                tableHTML += '<table border="1" style="border-collapse: collapse;">';
+                
+                // 表头定义
+                const columns = [
+                    'Porgram',
+                    'shipment',
+                    'OIA PO#',
+                    'Shipper Location',
+                    'Logistics Park',
+                    'Delivery Location',
+                    'Pickup Date',
+                    'Delivery Date',
+                    'Equipment',
+                    '车行',
+                    'Remarks'
+                ];
 
+                tableHTML += '<thead><tr>';
+                columns.forEach(col => {
+                    tableHTML += `<th>${col}<\/th>`;
+                });
+                tableHTML += '<\/tr><\/thead>';
+
+                // 数据行
+                tableHTML += '<tbody>';
+                
+                // 辅助函数：获取地址名称
+                const getAddrName = (id) => {
+                    const addr = addresses.find(a => a.id === id);
+                    return addr ? (addr.name || '未知站点') : '';
+                };
+
+                selectedOrders.forEach(o => {
+                    // 解析站点信息
+                    const stops = o.stops || [];
+                    let shipper = '';
+                    let logistics = '';
+                    let delivery = '';
+
+                    // 检查是否包含类型定义 (新逻辑)
+                    // 即使有类型定义，也尝试使用智能识别来增强（针对可能未正确标记的数据）
+                    // 但优先使用明确的类型
+                    
+                    const categorizeStop = (stop) => {
+                         // 1. 优先使用明确的类型
+                         if (stop.type) return stop.type;
+                         
+                         // 2. 智能识别 (针对旧数据或未选类型的数据)
+                         const addrName = getAddrName(stop.addressId);
+                         // 这里我们无法获取详细地址(location)因为 getAddrName 只返回名字
+                         // 为了更准确，我们需要直接访问 addresses 数组
+                         const addr = addresses.find(a => a.id === stop.addressId);
+                         if (addr) {
+                             const keywords = ['物流园', '物流中心', '保税仓', '仓库', '仓储', '堆场', 'Park', 'Logistics', 'Warehouse', 'Bonded', 'Depot'];
+                             const text = ((addr.name || '') + (addr.location || '')).toLowerCase();
+                             if (keywords.some(k => text.includes(k.toLowerCase()))) {
+                                 return 'logistics';
+                             }
+                         }
+                         
+                         return null; // 无法确定
+                    };
+
+                    const pickups = [];
+                    const logisticsStops = [];
+                    const deliveries = [];
+
+                    if (stops.length > 0) {
+                        stops.forEach((s, index) => {
+                            let type = categorizeStop(s);
+                            
+                            // 3. 如果仍未确定类型，使用位置推断 (兼容旧逻辑)
+                            if (!type) {
+                                if (index === 0) type = 'pickup';
+                                else if (index === stops.length - 1) type = 'delivery';
+                                else {
+                                    // 修正逻辑：对于中间站点，如果不是明确识别为物流园，
+                                    // 且不包含物流园关键词，则默认视为额外的提货点
+                                    // 除非它非常靠近末尾，可能被视为额外的送货点（这里暂且简化为提货点，满足用户"两个提货地"的需求）
+                                    type = 'pickup';
+                                }
+                            }
+                            
+                            const name = getAddrName(s.addressId);
+                            if (type === 'pickup') pickups.push(name);
+                            else if (type === 'delivery') deliveries.push(name);
+                            else logisticsStops.push(name);
+                        });
+                        
+                        shipper = pickups.join(' + ');
+                        delivery = deliveries.join(' + ');
+                        logistics = logisticsStops.join(' + ');
+                    }
+
+                    tableHTML += '<tr>';
+                    // 1. Porgram -> routeName
+                    tableHTML += `<td>${o.routeName || ''}<\/td>`;
+                    // 2. shipment -> shipmentId
+                    tableHTML += `<td>${o.shipmentId || ''}<\/td>`;
+                    // 3. OIA PO# -> poNumber
+                    tableHTML += `<td>${o.poNumber || ''}<\/td>`;
+                    // 4. Shipper Location
+                    tableHTML += `<td>${shipper}<\/td>`;
+                    // 5. Logistics Park
+                    tableHTML += `<td>${logistics}<\/td>`;
+                    // 6. Delivery Location
+                    tableHTML += `<td>${delivery}<\/td>`;
+                    // 7. Pickup Date
+                    tableHTML += `<td>${o.pickupDate ? dayjs(o.pickupDate).format('YYYY-MM-DD') : ''}<\/td>`;
+                    // 8. Delivery Date
+                    tableHTML += `<td>${o.deliveryDate ? dayjs(o.deliveryDate).format('YYYY-MM-DD') : ''}<\/td>`;
+                    // 9. Equipment -> vehicleType
+                    tableHTML += `<td>${o.vehicleType || ''}<\/td>`;
+                    // 10. 车行 -> fleet
+                    tableHTML += `<td>${o.fleet || ''}<\/td>`;
+                    // 11. Remarks -> note
+                    tableHTML += `<td>${o.note || ''}<\/td>`;
+                    
+                    tableHTML += '<\/tr>';
+                });
+                tableHTML += '<\/tbody><\/table><\/body><\/html>';
+
+                // 创建并下载文件
                 try {
-                    const ws = XLSX.utils.json_to_sheet(exportData);
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, "订单记录");
-                    XLSX.writeFile(wb, `订单导出_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`);
-                    message.success(`成功导出 ${selectedOrders.length} 条记录`);
+                    const blob = new Blob([tableHTML], { type: 'application/vnd.ms-excel' });
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `订单导出_自定义格式_${dayjs().format('YYYYMMDD_HHmmss')}.xls`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                    message.success(`成功导出 ${selectedOrders.length} 条记录 (自定义格式)`);
                 } catch (error) {
                     console.error('Export error:', error);
-                    message.error('导出失败，请确保网络正常以加载Excel组件');
+                    message.error('导出失败');
                 }
             };
 
