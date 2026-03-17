@@ -1604,7 +1604,12 @@
                     title: '提货日期', 
                     dataIndex: 'pickupDate', 
                     key: 'pickupDate',
-                    render: t => t ? dayjs(t).format('YYYY-MM-DD') : '-'
+                    render: t => t ? dayjs(t).format('YYYY-MM-DD') : '-',
+                    sorter: (a, b) => {
+                        const dateA = a.pickupDate ? dayjs(a.pickupDate).valueOf() : 0;
+                        const dateB = b.pickupDate ? dayjs(b.pickupDate).valueOf() : 0;
+                        return dateA - dateB;
+                    }
                 },
                 {
                     title: '操作',
