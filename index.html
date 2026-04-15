@@ -1432,6 +1432,9 @@
                     'Delivery Date',
                     'Equipment',
                     '车行',
+                    '件数',
+                    '体积 (CBM)',
+                    '重量 (KG)',
                     'Remarks'
                 ];
 
@@ -1533,7 +1536,13 @@
                     tableHTML += `<td>${o.vehicleType || ''}<\/td>`;
                     // 10. 车行 -> fleet
                     tableHTML += `<td>${o.fleet || ''}<\/td>`;
-                    // 11. Remarks -> note
+                    // 11. 件数 -> cargoCount
+                    tableHTML += `<td>${o.cargoCount || ''}<\/td>`;
+                    // 12. 体积 -> cargoCbm
+                    tableHTML += `<td>${o.cargoCbm || ''}<\/td>`;
+                    // 13. 重量 -> cargoWeight
+                    tableHTML += `<td>${o.cargoWeight || ''}<\/td>`;
+                    // 14. Remarks -> note
                     tableHTML += `<td>${o.note || ''}<\/td>`;
                     
                     tableHTML += '<\/tr>';
