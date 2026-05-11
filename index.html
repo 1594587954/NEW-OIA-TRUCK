@@ -122,7 +122,7 @@
             Button, Table, Modal, Form, Input, InputNumber, 
             Select, Tabs, Card, Space, message, Popconfirm, 
             Typography, List, Descriptions, Divider, Tag, Empty,
-            ConfigProvider, DatePicker, AutoComplete
+            ConfigProvider, DatePicker, AutoComplete, Checkbox
         } = antd;
         const { Title, Text } = Typography;
 
@@ -1365,6 +1365,7 @@
         const OrderManagement = ({ addresses, onEditOrder }) => {
             const [orders, setOrders] = React.useState([]);
             const [printData, setPrintData] = React.useState(null);
+            const [viewData, setViewData] = React.useState(null); // 新增用于查看的 state
             const [searchText, setSearchText] = React.useState('');
             const [selectedRowKeys, setSelectedRowKeys] = React.useState([]);
 
@@ -1561,6 +1562,17 @@
                     document.body.removeChild(link);
                     window.URL.revokeObjectURL(url);
                     message.success(`成功导出 ${selectedOrders.length} 条记录 (自定义格式)`);
+                    
+                    // 更新导出状态
+                    const newOrders = orders.map(o => {
+                        if (selectedRowKeys.includes(o.id)) {
+                            return { ...o, isExported: true };
+                        }
+                        return o;
+                    });
+                    saveOrders(newOrders);
+                    setOrders(newOrders);
+                    setSelectedRowKeys([]); // 导出后清空选择
                 } catch (error) {
                     console.error('Export error:', error);
                     message.error('导出失败');
@@ -1587,6 +1599,18 @@
                         message.success(`成功删除 ${selectedRowKeys.length} 条记录`);
                     },
                 });
+            };
+
+            const toggleExportStatus = (record) => {
+                const newOrders = orders.map(o => {
+                    if (o.id === record.id) {
+                        return { ...o, isExported: !o.isExported };
+                    }
+                    return o;
+                });
+                saveOrders(newOrders);
+                setOrders(newOrders);
+                message.success(record.isExported ? '已标记为未导出' : '已标记为已导出');
             };
 
             const filteredOrders = orders.filter(o => 
@@ -1623,9 +1647,12 @@
                 {
                     title: '操作',
                     key: 'action',
-                    width: 250,
+                    width: 380,
                     render: (_, record) => (
                         <Space size="small">
+                            <Button type="link" size="small" onClick={() => setViewData(record)}>
+                                🔍 查看
+                            </Button>
                             <Button type="link" size="small" onClick={() => handleReprint(record)}>
                                 🖨️ 打印
                             </Button>
@@ -1635,6 +1662,11 @@
                             <Popconfirm title="确定删除？" onConfirm={() => handleDelete(record.id)}>
                                 <Button type="link" size="small" danger>删除</Button>
                             </Popconfirm>
+                            <div style={{ marginLeft: 8, cursor: 'pointer' }} onClick={() => toggleExportStatus(record)}>
+                                <Tag color={record.isExported ? 'success' : 'default'} style={{ margin: 0 }}>
+                                    {record.isExported ? '已导出' : '未导出'}
+                                </Tag>
+                            </div>
                         </Space>
                     ),
                 },
@@ -1646,6 +1678,49 @@
                         <DispatchSheetPrint data={printData} addresses={addresses} />,
                         document.getElementById('print-root')
                     )}
+                    
+                    {/* 订单查看弹窗 */}
+                    <Modal
+                        title={
+                            <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                                <span style={{fontSize: 20}}>🔍</span>
+                                <span>订单预览</span>
+                            </div>
+                        }
+                        open={!!viewData}
+                        onCancel={() => setViewData(null)}
+                        width={900}
+                        footer={[
+                            <Button key="close" onClick={() => setViewData(null)}>关闭</Button>,
+                            <Button key="print" type="primary" onClick={() => {
+                                const record = viewData;
+                                setViewData(null);
+                                handleReprint(record);
+                            }}>
+                                🖨️ 打印
+                            </Button>
+                        ]}
+                    >
+                        {viewData && (
+                            <div style={{ 
+                                padding: '20px', 
+                                background: '#f5f5f5', 
+                                borderRadius: '8px',
+                                maxHeight: '70vh',
+                                overflowY: 'auto'
+                            }}>
+                                <div style={{ 
+                                    background: '#fff', 
+                                    padding: '20px', 
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                    pointerEvents: 'none' /* 防止在预览中发生交互 */
+                                }}>
+                                    <DispatchSheetPrint data={viewData} addresses={addresses} />
+                                </div>
+                            </div>
+                        )}
+                    </Modal>
+
                     <Card bordered={false} style={{ marginBottom: 24, boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
                         <div className="section-title" style={{ fontSize: '1.125rem', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
