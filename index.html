@@ -221,16 +221,16 @@
                                 <tr style={{ backgroundColor: '#fff', borderBottom: '2px solid #000' }}>
                                     <th style={{ padding: '10px', textAlign: 'left', borderRight: '1px solid #ddd' }}>货物描述</th>
                                     <th style={{ padding: '10px', textAlign: 'center', width: '100px', borderRight: '1px solid #ddd' }}>件数</th>
-                                    <th style={{ padding: '10px', textAlign: 'center', width: '100px', borderRight: '1px solid #ddd' }}>体积 (CBM)</th>
-                                    <th style={{ padding: '10px', textAlign: 'center', width: '100px' }}>重量 (KG)</th>
+                                    <th style={{ padding: '10px', textAlign: 'center', width: '100px', borderRight: '1px solid #ddd' }}>重量 (KG)</th>
+                                    <th style={{ padding: '10px', textAlign: 'center', width: '100px' }}>体积 (CBM)</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
                                     <td style={{ padding: '15px', borderRight: '1px solid #ddd', fontSize: '15px' }}>{data.cargoDescription || '-'}</td>
                                     <td style={{ padding: '15px', textAlign: 'center', borderRight: '1px solid #ddd', fontWeight: 'bold', fontSize: '16px' }}>{data.cargoCount || '-'}</td>
-                                    <td style={{ padding: '15px', textAlign: 'center', borderRight: '1px solid #ddd', fontWeight: 'bold', fontSize: '16px' }}>{data.cargoCbm || '-'}</td>
-                                    <td style={{ padding: '15px', textAlign: 'center', fontWeight: 'bold', fontSize: '16px' }}>{data.cargoWeight || '-'}</td>
+                                    <td style={{ padding: '15px', textAlign: 'center', borderRight: '1px solid #ddd', fontWeight: 'bold', fontSize: '16px' }}>{data.cargoWeight || '-'}</td>
+                                    <td style={{ padding: '15px', textAlign: 'center', fontWeight: 'bold', fontSize: '16px' }}>{data.cargoCbm || '-'}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -717,10 +717,10 @@
                                     <Form.Item name="cargoCount" label="总件数" style={{ marginBottom: 0 }}>
                                         <InputNumber min={0} controls={false} size="large" style={{width: '100%'}} variant="filled" />
                                     </Form.Item>
-                                    <Form.Item name="cargoCbm" label="总体积 (CBM)" style={{ marginBottom: 0 }}>
+                                    <Form.Item name="cargoWeight" label="总重量 (KG)" style={{ marginBottom: 0 }}>
                                         <InputNumber min={0} controls={false} size="large" style={{width: '100%'}} variant="filled" />
                                     </Form.Item>
-                                    <Form.Item name="cargoWeight" label="总重量 (KG)" style={{ marginBottom: 0 }}>
+                                    <Form.Item name="cargoCbm" label="总体积 (CBM)" style={{ marginBottom: 0 }}>
                                         <InputNumber min={0} controls={false} size="large" style={{width: '100%'}} variant="filled" />
                                     </Form.Item>
                                 </div>
@@ -1148,18 +1148,6 @@
                                 />
                             </div>
                             <div style={{ gridColumn: 'span 4' }}>
-                                <Text style={{ display: 'block', fontWeight: 500, color: '#4b5563', marginBottom: 8 }}>总CBM (立方)</Text>
-                                <InputNumber 
-                                    min={0} 
-                                    controls={false}
-                                    size="large"
-                                    style={{ width: '100%' }} 
-                                    variant="filled"
-                                    value={cargoInfo.cbm}
-                                    onChange={val => setCargoInfo({...cargoInfo, cbm: val})}
-                                />
-                            </div>
-                            <div style={{ gridColumn: 'span 4' }}>
                                 <Text style={{ display: 'block', fontWeight: 500, color: '#4b5563', marginBottom: 8 }}>总重量 (KG)</Text>
                                 <InputNumber 
                                     min={0} 
@@ -1169,6 +1157,18 @@
                                     variant="filled"
                                     value={cargoInfo.weight}
                                     onChange={val => setCargoInfo({...cargoInfo, weight: val})}
+                                />
+                            </div>
+                            <div style={{ gridColumn: 'span 4' }}>
+                                <Text style={{ display: 'block', fontWeight: 500, color: '#4b5563', marginBottom: 8 }}>总CBM (立方)</Text>
+                                <InputNumber 
+                                    min={0} 
+                                    controls={false}
+                                    size="large"
+                                    style={{ width: '100%' }} 
+                                    variant="filled"
+                                    value={cargoInfo.cbm}
+                                    onChange={val => setCargoInfo({...cargoInfo, cbm: val})}
                                 />
                             </div>
                             <div style={{ gridColumn: 'span 12' }}>
@@ -1253,9 +1253,9 @@
                                 <Space size="small" style={{color: '#666'}}>
                                     <span>{record.cargo.count}件</span>
                                     <span>|</span>
-                                    <span>{record.cargo.cbm}m³</span>
-                                    <span>|</span>
                                     <span>{record.cargo.weight}kg</span>
+                                    <span>|</span>
+                                    <span>{record.cargo.cbm}m³</span>
                                 </Space>
                             </div>
                         );
@@ -1434,8 +1434,8 @@
                     'Equipment',
                     '车行',
                     '件数',
-                    '体积 (CBM)',
                     '重量 (KG)',
+                    '体积 (CBM)',
                     'Remarks'
                 ];
 
@@ -1539,10 +1539,10 @@
                     tableHTML += `<td>${o.fleet || ''}<\/td>`;
                     // 11. 件数 -> cargoCount
                     tableHTML += `<td>${o.cargoCount || ''}<\/td>`;
-                    // 12. 体积 -> cargoCbm
-                    tableHTML += `<td>${o.cargoCbm || ''}<\/td>`;
-                    // 13. 重量 -> cargoWeight
+                    // 12. 重量 -> cargoWeight
                     tableHTML += `<td>${o.cargoWeight || ''}<\/td>`;
+                    // 13. 体积 -> cargoCbm
+                    tableHTML += `<td>${o.cargoCbm || ''}<\/td>`;
                     // 14. Remarks -> note
                     tableHTML += `<td>${o.note || ''}<\/td>`;
                     
