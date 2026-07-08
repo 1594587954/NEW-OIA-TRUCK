@@ -259,7 +259,7 @@
             );
         };
 
-        // --- 数据存储层 (LocalStorage) ---
+        // --- 数据存储层 (LocalStorage & IndexedDB) ---
         const DB_KEYS = {
             ADDRESSES: 'dispatch_addresses',
             ROUTES: 'dispatch_routes',
@@ -267,38 +267,107 @@
             FLEETS: 'dispatch_fleets'
         };
 
+        const initDB = () => {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('DispatchSystemDB', 1);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('backups')) {
+                        db.createObjectStore('backups', { keyPath: 'timestamp' });
+                    }
+                };
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        };
+
+        const backupDataToIndexedDB = async () => {
+            try {
+                const db = await initDB();
+                const transaction = db.transaction(['backups'], 'readwrite');
+                const store = transaction.objectStore('backups');
+                const backupData = {
+                    timestamp: new Date().toISOString(),
+                    addresses: getAddresses(),
+                    routes: getRoutes(),
+                    orders: getOrders(),
+                    fleets: getFleets()
+                };
+                store.put(backupData);
+                
+                // 保留最近 20 条备份记录
+                const countReq = store.count();
+                countReq.onsuccess = () => {
+                    if (countReq.result > 20) {
+                        const cursorReq = store.openCursor();
+                        let deleteCount = countReq.result - 20;
+                        cursorReq.onsuccess = (e) => {
+                            const cursor = e.target.result;
+                            if (cursor && deleteCount > 0) {
+                                cursor.delete();
+                                deleteCount--;
+                                cursor.continue();
+                            }
+                        };
+                    }
+                };
+            } catch (err) {
+                console.error('IndexedDB 备份失败', err);
+            }
+        };
+
+        const debounceBackup = (() => {
+            let timer = null;
+            return () => {
+                if (timer) clearTimeout(timer);
+                timer = setTimeout(backupDataToIndexedDB, 2000);
+            };
+        })();
+
         const getAddresses = () => {
             try {
                 return JSON.parse(localStorage.getItem(DB_KEYS.ADDRESSES) || '[]');
             } catch (e) { return []; }
         };
-        const saveAddresses = (data) => localStorage.setItem(DB_KEYS.ADDRESSES, JSON.stringify(data));
+        const saveAddresses = (data) => {
+            localStorage.setItem(DB_KEYS.ADDRESSES, JSON.stringify(data));
+            debounceBackup();
+        };
 
         const getFleets = () => {
             try {
                 return JSON.parse(localStorage.getItem(DB_KEYS.FLEETS) || '[]');
             } catch (e) { return []; }
         };
-        const saveFleets = (data) => localStorage.setItem(DB_KEYS.FLEETS, JSON.stringify(data));
+        const saveFleets = (data) => {
+            localStorage.setItem(DB_KEYS.FLEETS, JSON.stringify(data));
+            debounceBackup();
+        };
 
         const getRoutes = () => {
             try {
                 return JSON.parse(localStorage.getItem(DB_KEYS.ROUTES) || '[]');
             } catch (e) { return []; }
         };
-        const saveRoutes = (data) => localStorage.setItem(DB_KEYS.ROUTES, JSON.stringify(data));
+        const saveRoutes = (data) => {
+            localStorage.setItem(DB_KEYS.ROUTES, JSON.stringify(data));
+            debounceBackup();
+        };
 
         const getOrders = () => {
             try {
                 return JSON.parse(localStorage.getItem(DB_KEYS.ORDERS) || '[]');
             } catch (e) { return []; }
         };
-        const saveOrders = (data) => localStorage.setItem(DB_KEYS.ORDERS, JSON.stringify(data));
+        const saveOrders = (data) => {
+            localStorage.setItem(DB_KEYS.ORDERS, JSON.stringify(data));
+            debounceBackup();
+        };
 
         // --- 组件定义 ---
 
         // 4. 派车单生成组件 (新增)
-        const DispatchGenerator = ({ routes, addresses, editingOrder, onOrderComplete, onCancelEdit }) => {
+        const DispatchGenerator = ({ routes, addresses, setAddresses, editingOrder, onOrderComplete, onCancelEdit }) => {
             const [form] = Form.useForm();
             const [selectedRoute, setSelectedRoute] = useState(null);
             const [currentStops, setCurrentStops] = useState([]);
@@ -353,20 +422,23 @@
                 message.info('已加载订单数据');
             };
 
-            const handleShipmentBlur = (e) => {
-                const val = e.target.value;
+            const handleOrderLookup = (type, val) => {
                 if (!val || editingOrder) return;
                 
                 const orders = getOrders();
-                const historyOrder = orders.find(o => o.shipmentId === val);
+                const historyOrder = orders.find(o => o[type] === val);
                 if (historyOrder) {
+                    const label = type === 'shipmentId' ? 'Shipment ID' : 'PO 号码';
                     Modal.confirm({
                         title: '发现历史订单记录',
-                        content: `找到相同 Shipment ID (${val}) 的历史记录，是否自动带出当时的信息？`,
+                        content: `找到相同 ${label} (${val}) 的历史记录，是否自动带出当时的信息？`,
                         onOk: () => fillFormFromOrder(historyOrder)
                     });
                 }
             };
+
+            const handleShipmentBlur = (e) => handleOrderLookup('shipmentId', e.target.value);
+            const handlePoBlur = (e) => handleOrderLookup('poNumber', e.target.value);
 
             const handleRouteSelect = (routeId) => {
                 const route = routes.find(r => r.id === routeId);
@@ -379,12 +451,15 @@
                     })));
                     
                     // 自动填充表单
+                    const currentValues = form.getFieldsValue();
                     form.setFieldsValue({
                         cargoDescription: route.cargo?.description,
                         cargoCount: route.cargo?.count,
                         cargoCbm: route.cargo?.cbm,
                         cargoWeight: route.cargo?.weight,
-                        note: route.cargo?.note
+                        note: route.cargo?.note,
+                        fleet: currentValues.fleet || route.fleet,
+                        vehicleType: currentValues.vehicleType || route.vehicleType
                     });
                     message.success('已自动加载线路信息');
                 }
@@ -547,20 +622,17 @@
             const handleParseText = (text) => {
                 if (!text) return;
                 
-                // 简单的智能解析逻辑：通过换行、逗号或空格分割，并寻找关键字
                 let parsedName = '';
                 let parsedLocation = '';
                 let parsedPerson = '';
                 let parsedPhone = '';
 
-                // 尝试提取手机号 (11位数字)
                 const phoneMatch = text.match(/(?:1[3-9]\d{9})/);
                 if (phoneMatch) {
                     parsedPhone = phoneMatch[0];
-                    text = text.replace(parsedPhone, ''); // 移除提取过的部分
+                    text = text.replace(parsedPhone, '');
                 }
 
-                // 按常见分隔符切分
                 const parts = text.split(/[,，\s\n]+/).map(p => p.trim()).filter(Boolean);
 
                 parts.forEach(part => {
@@ -568,17 +640,14 @@
                     if (part.includes('省') || part.includes('市') || part.includes('区') || part.includes('县') || part.includes('镇') || part.includes('路')) {
                         parsedLocation = part;
                     } else if (part.length >= 2 && part.length <= 4 && !/\d/.test(part) && !parsedPerson) {
-                        // 假设2-4个字的纯中文字符为联系人（且之前未识别出联系人）
                         parsedPerson = part;
                     } else if (!parsedName) {
-                        // 剩下的第一个比较长的词作为名称
                         parsedName = part;
                     }
                 });
 
-                // 更新表单
-                const currentValues = form.getFieldsValue();
-                form.setFieldsValue({
+                const currentValues = quickAddressForm.getFieldsValue();
+                quickAddressForm.setFieldsValue({
                     name: currentValues.name || parsedName,
                     location: currentValues.location || parsedLocation,
                     contactPerson: currentValues.contactPerson || parsedPerson,
@@ -586,6 +655,22 @@
                 });
                 
                 message.success('文本解析完成，请核对信息');
+            };
+
+            const handleQuickAddressSave = () => {
+                quickAddressForm.validateFields().then(values => {
+                    const newAddr = { id: Date.now().toString(), ...values };
+                    const newAddresses = [...addresses, newAddr];
+                    saveAddresses(newAddresses);
+                    if (setAddresses) setAddresses(newAddresses);
+                    
+                    const defaultType = currentStops.length === 0 ? 'pickup' : 'delivery';
+                    setCurrentStops([...currentStops, { key: Date.now(), addressId: newAddr.id, type: defaultType }]);
+                    
+                    setIsQuickAddressModalOpen(false);
+                    quickAddressForm.resetFields();
+                    message.success('地址已创建并添加到站点');
+                });
             };
 
             return (
@@ -657,7 +742,7 @@
                                             }),
                                         ]}
                                     >
-                                        <Input size="large" variant="filled" placeholder="请输入 PO Number" />
+                                        <Input size="large" variant="filled" placeholder="请输入 PO Number" onBlur={handlePoBlur} />
                                     </Form.Item>
                                     <Form.Item 
                                         name="fleet" 
@@ -986,20 +1071,6 @@
                         centered
                     >
                         <Form form={form} layout="vertical" style={{ paddingTop: 16 }}>
-                            <div style={{ marginBottom: 16, padding: '12px', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px dashed #22c55e' }}>
-                                <div style={{ marginBottom: '8px', color: '#166534', fontWeight: 'bold', fontSize: '13px' }}>
-                                    ✨ 智能识别 (选填)
-                                </div>
-                                <Input.Search 
-                                    placeholder="粘贴包含姓名、电话、地址的整段文本，点击右侧解析" 
-                                    enterButton="智能解析" 
-                                    size="middle"
-                                    onSearch={handleParseText}
-                                />
-                                <div style={{ marginTop: '4px', color: '#166534', fontSize: '12px' }}>
-                                    例如："张三，13800000000，广东省深圳市龙岗区XX路"
-                                </div>
-                            </div>
                             <Form.Item name="name" label="工厂/物流园名称" rules={[{ required: true, message: '请输入名称' }]}>
                                 <Input size="large" variant="filled" placeholder="例如：捷通物流园" />
                             </Form.Item>
@@ -1028,6 +1099,12 @@
             const [form] = Form.useForm();
             const [stops, setStops] = useState([]);
             const [draggedIndex, setDraggedIndex] = useState(null);
+            const [fleets, setFleets] = useState([]);
+            
+            useEffect(() => {
+                setFleets(getFleets());
+            }, []);
+
             // 全局货物信息状态
             const [cargoInfo, setCargoInfo] = useState({
                 description: '',
@@ -1040,7 +1117,11 @@
             // 如果处于编辑模式，初始化表单和状态
             useEffect(() => {
                 if (editingRoute) {
-                    form.setFieldsValue({ routeName: editingRoute.name });
+                    form.setFieldsValue({ 
+                        routeName: editingRoute.name,
+                        fleet: editingRoute.fleet,
+                        vehicleType: editingRoute.vehicleType
+                    });
                     setStops(editingRoute.stops.map((s, i) => ({ 
                         key: Date.now() + i, 
                         addressId: s.addressId,
@@ -1049,7 +1130,7 @@
                     })));
                     setCargoInfo(editingRoute.cargo || { description: '', count: 0, cbm: 0, weight: 0, note: '' });
                 }
-            }, [editingRoute]);
+            }, [editingRoute, form]);
 
             const handleCancelEdit = () => {
                 setEditingRoute(null);
@@ -1148,6 +1229,8 @@
                     const routeData = {
                         id: editingRoute ? editingRoute.id : Date.now().toString(),
                         name: values.routeName,
+                        fleet: values.fleet,
+                        vehicleType: values.vehicleType,
                         // 新的数据结构：站点包含地址ID和类型
                         stops: stops.map(s => ({
                             addressId: s.addressId,
@@ -1194,9 +1277,25 @@
                             )}
                         </div>
                         <Form form={form} layout="vertical">
-                            <Form.Item name="routeName" label={<span style={{ fontWeight: 'bold', color: '#374151' }}>路线名称</span>} rules={[{ required: true, message: '请输入路线名称' }]}>
+                            <Form.Item name="routeName" label={<span style={{ fontWeight: 'bold', color: '#374151' }}>路线模板名称</span>} rules={[{ required: true, message: '请输入路线名称' }]}>
                                 <Input size="large" placeholder="例如：2023-10-27 深圳-东莞-惠州 拼车" variant="filled" style={{fontSize: 16}} />
                             </Form.Item>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                <Form.Item name="fleet" label="默认承运车队 (选填)">
+                                    <AutoComplete
+                                        options={fleets.map(f => ({ value: f.value }))}
+                                        filterOption={(inputValue, option) =>
+                                            option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+                                        }
+                                        size="large"
+                                        variant="filled"
+                                        placeholder="输入或选择车队"
+                                    />
+                                </Form.Item>
+                                <Form.Item name="vehicleType" label="默认车型偏好 (选填)">
+                                    <Input size="large" variant="filled" placeholder="例如：2台5吨车 / 40HQ" />
+                                </Form.Item>
+                            </div>
                         </Form>
                     </Card>
 
@@ -2162,6 +2261,130 @@
             );
         };
 
+        // 7. 数据分析与财务统计组件 (新增)
+        const DataAnalysis = () => {
+            const [orders, setOrders] = useState([]);
+            const [fleetStats, setFleetStats] = useState([]);
+            const [monthlyStats, setMonthlyStats] = useState([]);
+            const [year, setYear] = useState(dayjs().year());
+
+            useEffect(() => {
+                const allOrders = getOrders();
+                setOrders(allOrders);
+                calculateStats(allOrders, year);
+            }, [year]);
+
+            const calculateStats = (data, selectedYear) => {
+                const fleetMap = {};
+                const monthMap = {};
+                
+                // 初始化 1-12 月
+                for (let i = 1; i <= 12; i++) {
+                     const monthKey = `${selectedYear}-${String(i).padStart(2, '0')}`;
+                     monthMap[monthKey] = {
+                         month: `${i}月`,
+                         count: 0,
+                         totalWeight: 0,
+                         totalCbm: 0,
+                         totalItems: 0
+                     };
+                 }
+
+                data.forEach(order => {
+                    if (!order.pickupDate) return;
+                    const date = dayjs(order.pickupDate);
+                    if (date.year() !== selectedYear) return;
+
+                    const monthKey = date.format('YYYY-MM');
+                    
+                    // 月度货量统计
+                    if (monthMap[monthKey]) {
+                        monthMap[monthKey].count += 1;
+                        monthMap[monthKey].totalWeight += Number(order.cargoWeight) || 0;
+                        monthMap[monthKey].totalCbm += Number(order.cargoCbm) || 0;
+                        monthMap[monthKey].totalItems += Number(order.cargoCount) || 0;
+                    }
+
+                    // 车队统计
+                    if (order.fleet) {
+                        if (!fleetMap[order.fleet]) {
+                            fleetMap[order.fleet] = { fleet: order.fleet, usageCount: 0, totalOrders: 0 };
+                        }
+                        fleetMap[order.fleet].usageCount += 1;
+                        fleetMap[order.fleet].totalOrders += 1;
+                    }
+                });
+
+                setMonthlyStats(Object.values(monthMap));
+                setFleetStats(Object.values(fleetMap).sort((a, b) => b.usageCount - a.usageCount));
+            };
+
+            const fleetColumns = [
+                { title: '承运车队', dataIndex: 'fleet', key: 'fleet', render: t => <Text strong>{t}</Text> },
+                { title: '派车次数', dataIndex: 'usageCount', key: 'usageCount', sorter: (a, b) => a.usageCount - b.usageCount }
+            ];
+
+            const monthColumns = [
+                { title: '月份', dataIndex: 'month', key: 'month', render: t => <Text strong>{t}</Text> },
+                { title: '发货单数', dataIndex: 'count', key: 'count' },
+                { title: '总件数', dataIndex: 'totalItems', key: 'totalItems' },
+                { title: '总重量 (KG)', dataIndex: 'totalWeight', key: 'totalWeight', render: val => val.toFixed(2) },
+                { title: '总体积 (CBM)', dataIndex: 'totalCbm', key: 'totalCbm', render: val => val.toFixed(2) }
+            ];
+
+            return (
+                <div style={{ padding: '0 8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                        <div className="section-title" style={{ fontSize: '1.25rem', margin: 0 }}>
+                            <span style={{ fontSize: '1.5rem' }}>📈</span> 数据分析与财务统计
+                        </div>
+                        <Select 
+                            value={year} 
+                            onChange={setYear} 
+                            style={{ width: 120 }} 
+                            size="large"
+                            options={[
+                                { value: dayjs().year() + 1, label: `${dayjs().year() + 1}年` },
+                                { value: dayjs().year(), label: `${dayjs().year()}年` },
+                                { value: dayjs().year() - 1, label: `${dayjs().year() - 1}年` }
+                            ]}
+                        />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+                        <Card 
+                            title={<><span style={{marginRight: 8}}>🚚</span>运力/车队统计报表</>} 
+                            bordered={false} 
+                            style={{ boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                        >
+                            <Table 
+                                dataSource={fleetStats} 
+                                columns={fleetColumns} 
+                                rowKey="fleet" 
+                                pagination={{ pageSize: 5 }} 
+                                size="middle"
+                            />
+                        </Card>
+
+                        <Card 
+                            title={<><span style={{marginRight: 8}}>📦</span>货量月度总结 ({year}年)</>} 
+                            bordered={false} 
+                            style={{ boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                        >
+                            <Table 
+                                dataSource={monthlyStats} 
+                                columns={monthColumns} 
+                                rowKey="month" 
+                                pagination={false} 
+                                size="small"
+                                scroll={{ y: 300 }}
+                            />
+                        </Card>
+                    </div>
+                </div>
+            );
+        };
+
         // --- 主应用入口 ---
         const App = () => {
             const [addresses, setAddresses] = useState([]);
@@ -2256,6 +2479,7 @@
                     children: <DispatchGenerator 
                         routes={routes} 
                         addresses={addresses} 
+                        setAddresses={setAddresses}
                         editingOrder={editingOrder}
                         onOrderComplete={handleOrderComplete}
                         onCancelEdit={handleCancelEdit}
@@ -2292,6 +2516,11 @@
                         setActiveTab={setActiveTab}
                         setEditingRoute={setEditingRoute}
                     />,
+                },
+                {
+                    key: '6',
+                    label: <span style={{fontSize: 16}}>📈 数据分析</span>,
+                    children: <DataAnalysis />,
                 },
                 {
                     key: '1',
