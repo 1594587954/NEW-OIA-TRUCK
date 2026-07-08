@@ -89,6 +89,16 @@
             }
         }
         #print-root { display: none; }
+        
+        /* 订单高亮效果 */
+        .highlighted-row {
+            animation: highlight-fade 3s ease-out forwards;
+        }
+        @keyframes highlight-fade {
+            0% { background-color: #fffbe6; }
+            50% { background-color: #fffbe6; }
+            100% { background-color: transparent; }
+        }
     </style>
 </head>
 <body>
@@ -292,6 +302,7 @@
             const [form] = Form.useForm();
             const [selectedRoute, setSelectedRoute] = useState(null);
             const [currentStops, setCurrentStops] = useState([]);
+            const [draggedIndex, setDraggedIndex] = useState(null);
             const [printData, setPrintData] = useState(null);
             const [fleets, setFleets] = useState([]);
 
@@ -303,40 +314,59 @@
             // 监听编辑状态
             useEffect(() => {
                 if (editingOrder) {
-                    // 填充表单
-                    form.setFieldsValue({
-                        routeSelect: editingOrder.routeSelect, // 尝试保留选择状态
-                        shipmentId: editingOrder.shipmentId,
-                        poNumber: editingOrder.poNumber,
-                        fleet: editingOrder.fleet,
-                        vehicleType: editingOrder.vehicleType,
-                        pickupDate: editingOrder.pickupDate ? dayjs(editingOrder.pickupDate) : null,
-                        deliveryDate: editingOrder.deliveryDate ? dayjs(editingOrder.deliveryDate) : null,
-                        cargoDescription: editingOrder.cargoDescription,
-                        cargoCount: editingOrder.cargoCount,
-                        cargoCbm: editingOrder.cargoCbm,
-                        cargoWeight: editingOrder.cargoWeight,
-                        note: editingOrder.note
-                    });
-                    
-                    // 恢复路线选择状态 (如果存在)
-                    if (editingOrder.routeSelect) {
-                         const route = routes.find(r => r.id === editingOrder.routeSelect);
-                         if (route) setSelectedRoute(route);
-                         else setSelectedRoute({ name: editingOrder.routeName }); // Fallback name
-                    } else {
-                         setSelectedRoute({ name: editingOrder.routeName });
-                    }
-
-                    // 恢复站点
-                    setCurrentStops((editingOrder.stops || []).map((s, i) => ({
-                        key: Date.now() + i,
-                        addressId: s.addressId,
-                        type: s.type || (i === 0 ? 'pickup' : (i === (editingOrder.stops || []).length - 1 ? 'delivery' : 'logistics'))
-                    })));
-                    message.info('已加载订单数据，修改后点击“保存并重新生成”即可更新');
+                    fillFormFromOrder(editingOrder);
                 }
             }, [editingOrder, form, routes]);
+
+            const fillFormFromOrder = (order) => {
+                // 填充表单
+                form.setFieldsValue({
+                    routeSelect: order.routeSelect, // 尝试保留选择状态
+                    shipmentId: order.shipmentId,
+                    poNumber: order.poNumber,
+                    fleet: order.fleet,
+                    vehicleType: order.vehicleType,
+                    pickupDate: order.pickupDate ? dayjs(order.pickupDate) : null,
+                    deliveryDate: order.deliveryDate ? dayjs(order.deliveryDate) : null,
+                    cargoDescription: order.cargoDescription,
+                    cargoCount: order.cargoCount,
+                    cargoCbm: order.cargoCbm,
+                    cargoWeight: order.cargoWeight,
+                    note: order.note
+                });
+                
+                // 恢复路线选择状态 (如果存在)
+                if (order.routeSelect) {
+                     const route = routes.find(r => r.id === order.routeSelect);
+                     if (route) setSelectedRoute(route);
+                     else setSelectedRoute({ name: order.routeName }); // Fallback name
+                } else {
+                     setSelectedRoute({ name: order.routeName });
+                }
+
+                // 恢复站点
+                setCurrentStops((order.stops || []).map((s, i) => ({
+                    key: Date.now() + i,
+                    addressId: s.addressId,
+                    type: s.type || (i === 0 ? 'pickup' : (i === (order.stops || []).length - 1 ? 'delivery' : 'logistics'))
+                })));
+                message.info('已加载订单数据');
+            };
+
+            const handleShipmentBlur = (e) => {
+                const val = e.target.value;
+                if (!val || editingOrder) return;
+                
+                const orders = getOrders();
+                const historyOrder = orders.find(o => o.shipmentId === val);
+                if (historyOrder) {
+                    Modal.confirm({
+                        title: '发现历史订单记录',
+                        content: `找到相同 Shipment ID (${val}) 的历史记录，是否自动带出当时的信息？`,
+                        onOk: () => fillFormFromOrder(historyOrder)
+                    });
+                }
+            };
 
             const handleRouteSelect = (routeId) => {
                 const route = routes.find(r => r.id === routeId);
@@ -371,6 +401,30 @@
                 const newStops = [...currentStops];
                 newStops.splice(index, 1);
                 setCurrentStops(newStops);
+            };
+
+            const handleDragStart = (e, index) => {
+                setDraggedIndex(index);
+                e.dataTransfer.effectAllowed = 'move';
+                // Some browsers require setData to allow drag
+                e.dataTransfer.setData('text/plain', index);
+            };
+
+            const handleDragOver = (e, index) => {
+                e.preventDefault();
+                if (draggedIndex === null || draggedIndex === index) return;
+                
+                const newStops = [...currentStops];
+                const draggedItem = newStops[draggedIndex];
+                newStops.splice(draggedIndex, 1);
+                newStops.splice(index, 0, draggedItem);
+                
+                setCurrentStops(newStops);
+                setDraggedIndex(index);
+            };
+
+            const handleDragEnd = () => {
+                setDraggedIndex(null);
             };
 
             const handleStopTypeChange = (index, val) => {
@@ -466,13 +520,13 @@
                         message.success('已自动保存到订单记录');
                     }
 
-                    // 构造文件名: 派车单-Shipment-PO-提货日期-路线名称
-                    const shipmentId = values.shipmentId || '无单号';
-                    const poNumber = values.poNumber || '无PO';
+                    // 构造文件名: 派车单-单号(Shipment优先)-提货日期-车型-路线名称
+                    const identifier = values.shipmentId || values.poNumber || '无单号';
                     const pickupDate = values.pickupDate ? dayjs(values.pickupDate).format('YYYY-MM-DD') : '无日期';
+                    const vehicleType = values.vehicleType || '无车型';
                     const safeRouteName = routeName || '无路线';
                     
-                    const fileName = `派车单-${shipmentId}-${poNumber}-${pickupDate}-${safeRouteName}`;
+                    const fileName = `派车单-${identifier}-${pickupDate}-${vehicleType}-${safeRouteName}`;
                     
                     // 保存原有标题并设置新标题
                     const oldTitle = document.title;
@@ -488,6 +542,50 @@
                         }, 1000);
                     }, 100);
                 });
+            };
+
+            const handleParseText = (text) => {
+                if (!text) return;
+                
+                // 简单的智能解析逻辑：通过换行、逗号或空格分割，并寻找关键字
+                let parsedName = '';
+                let parsedLocation = '';
+                let parsedPerson = '';
+                let parsedPhone = '';
+
+                // 尝试提取手机号 (11位数字)
+                const phoneMatch = text.match(/(?:1[3-9]\d{9})/);
+                if (phoneMatch) {
+                    parsedPhone = phoneMatch[0];
+                    text = text.replace(parsedPhone, ''); // 移除提取过的部分
+                }
+
+                // 按常见分隔符切分
+                const parts = text.split(/[,，\s\n]+/).map(p => p.trim()).filter(Boolean);
+
+                parts.forEach(part => {
+                    if (!part) return;
+                    if (part.includes('省') || part.includes('市') || part.includes('区') || part.includes('县') || part.includes('镇') || part.includes('路')) {
+                        parsedLocation = part;
+                    } else if (part.length >= 2 && part.length <= 4 && !/\d/.test(part) && !parsedPerson) {
+                        // 假设2-4个字的纯中文字符为联系人（且之前未识别出联系人）
+                        parsedPerson = part;
+                    } else if (!parsedName) {
+                        // 剩下的第一个比较长的词作为名称
+                        parsedName = part;
+                    }
+                });
+
+                // 更新表单
+                const currentValues = form.getFieldsValue();
+                form.setFieldsValue({
+                    name: currentValues.name || parsedName,
+                    location: currentValues.location || parsedLocation,
+                    contactPerson: currentValues.contactPerson || parsedPerson,
+                    contactInfo: currentValues.contactInfo || parsedPhone,
+                });
+                
+                message.success('文本解析完成，请核对信息');
             };
 
             return (
@@ -542,7 +640,7 @@
                                             }),
                                         ]}
                                     >
-                                        <Input size="large" variant="filled" placeholder="请输入 Shipment ID" />
+                                        <Input size="large" variant="filled" placeholder="请输入 Shipment ID" onBlur={handleShipmentBlur} />
                                     </Form.Item>
                                     <Form.Item 
                                         name="poNumber" 
@@ -636,7 +734,22 @@
                                 <div style={{ backgroundColor: '#f9fafb', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#f3f4f6', borderStyle: 'solid', marginBottom: 24 }}>
                                     {currentStops.length > 0 ? (
                                         currentStops.map((stop, index) => (
-                                            <div key={stop.key} style={{ display: 'flex', gap: 16, marginBottom: 16, alignItems: 'start' }}>
+                                            <div 
+                                                key={stop.key} 
+                                                draggable
+                                                onDragStart={(e) => handleDragStart(e, index)}
+                                                onDragOver={(e) => handleDragOver(e, index)}
+                                                onDragEnd={handleDragEnd}
+                                                style={{ 
+                                                    display: 'flex', gap: 16, marginBottom: 16, alignItems: 'start',
+                                                    opacity: draggedIndex === index ? 0.5 : 1,
+                                                    cursor: 'grab',
+                                                    transition: 'opacity 0.2s',
+                                                    backgroundColor: draggedIndex === index ? '#f3f4f6' : 'transparent',
+                                                    padding: '8px',
+                                                    borderRadius: '8px'
+                                                }}
+                                            >
                                                 <div style={{ 
                                                     width: 32, 
                                                     height: 32, 
@@ -698,6 +811,7 @@
                                                     icon={<span style={{fontSize: '1.25rem'}}>×</span>}
                                                     onClick={() => handleRemoveStop(index)}
                                                     style={{ marginTop: 4 }}
+                                                    title="删除"
                                                 />
                                             </div>
                                         ))
@@ -872,6 +986,20 @@
                         centered
                     >
                         <Form form={form} layout="vertical" style={{ paddingTop: 16 }}>
+                            <div style={{ marginBottom: 16, padding: '12px', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px dashed #22c55e' }}>
+                                <div style={{ marginBottom: '8px', color: '#166534', fontWeight: 'bold', fontSize: '13px' }}>
+                                    ✨ 智能识别 (选填)
+                                </div>
+                                <Input.Search 
+                                    placeholder="粘贴包含姓名、电话、地址的整段文本，点击右侧解析" 
+                                    enterButton="智能解析" 
+                                    size="middle"
+                                    onSearch={handleParseText}
+                                />
+                                <div style={{ marginTop: '4px', color: '#166534', fontSize: '12px' }}>
+                                    例如："张三，13800000000，广东省深圳市龙岗区XX路"
+                                </div>
+                            </div>
                             <Form.Item name="name" label="工厂/物流园名称" rules={[{ required: true, message: '请输入名称' }]}>
                                 <Input size="large" variant="filled" placeholder="例如：捷通物流园" />
                             </Form.Item>
@@ -899,6 +1027,7 @@
         const RoutePlanning = ({ addresses, routes, setRoutes, setActiveTab, editingRoute, setEditingRoute }) => {
             const [form] = Form.useForm();
             const [stops, setStops] = useState([]);
+            const [draggedIndex, setDraggedIndex] = useState(null);
             // 全局货物信息状态
             const [cargoInfo, setCargoInfo] = useState({
                 description: '',
@@ -944,6 +1073,29 @@
                 const newStops = [...stops];
                 newStops.splice(index, 1);
                 setStops(newStops);
+            };
+
+            const handleDragStart = (e, index) => {
+                setDraggedIndex(index);
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', index);
+            };
+
+            const handleDragOver = (e, index) => {
+                e.preventDefault();
+                if (draggedIndex === null || draggedIndex === index) return;
+                
+                const newStops = [...stops];
+                const draggedItem = newStops[draggedIndex];
+                newStops.splice(draggedIndex, 1);
+                newStops.splice(index, 0, draggedItem);
+                
+                setStops(newStops);
+                setDraggedIndex(index);
+            };
+
+            const handleDragEnd = () => {
+                setDraggedIndex(null);
             };
 
             const handleStopTypeChange = (index, val) => {
@@ -1065,7 +1217,22 @@
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                             {stops.map((stop, index) => (
-                                <div key={stop.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, backgroundColor: 'white', borderWidth: 1, borderColor: '#f3f4f6', borderStyle: 'solid', borderRadius: 8, boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
+                                <div 
+                                    key={stop.key} 
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e, index)}
+                                    onDragOver={(e) => handleDragOver(e, index)}
+                                    onDragEnd={handleDragEnd}
+                                    style={{ 
+                                        display: 'flex', alignItems: 'center', gap: 12, padding: 12, 
+                                        backgroundColor: draggedIndex === index ? '#f3f4f6' : 'white', 
+                                        borderWidth: 1, borderColor: '#f3f4f6', borderStyle: 'solid', 
+                                        borderRadius: 8, boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                                        opacity: draggedIndex === index ? 0.5 : 1,
+                                        cursor: 'grab',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                >
                                     <div style={{ backgroundColor: '#2563eb', color: 'white', borderRadius: 9999, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', flexShrink: 0 }}>
                                         {index + 1}
                                     </div>
@@ -1113,6 +1280,7 @@
                                         onClick={() => handleRemoveStop(index)}
                                         style={{ borderRadius: 9999 }}
                                         icon={<span style={{ fontSize: '1.125rem' }}>×</span>}
+                                        title="删除"
                                     />
                                 </div>
                             ))}
@@ -1362,12 +1530,13 @@
 
 
         // 5. 订单记录管理组件 (新增)
-        const OrderManagement = ({ addresses, onEditOrder }) => {
+        const OrderManagement = ({ addresses, onEditOrder, highlightedOrderId }) => {
             const [orders, setOrders] = React.useState([]);
             const [printData, setPrintData] = React.useState(null);
             const [viewData, setViewData] = React.useState(null); // 新增用于查看的 state
             const [searchText, setSearchText] = React.useState('');
             const [selectedRowKeys, setSelectedRowKeys] = React.useState([]);
+            const [dateRange, setDateRange] = React.useState(null);
 
             React.useEffect(() => {
                 setOrders(getOrders());
@@ -1390,12 +1559,12 @@
             const handleReprint = (record) => {
                 setPrintData(record);
                 
-                // 构造文件名
-                const shipmentId = record.shipmentId || '无单号';
-                const poNumber = record.poNumber || '无PO';
+                // 构造文件名: 派车单-单号(Shipment优先)-提货日期-车型-路线名称
+                const identifier = record.shipmentId || record.poNumber || '无单号';
                 const pickupDate = record.pickupDate ? dayjs(record.pickupDate).format('YYYY-MM-DD') : '无日期';
+                const vehicleType = record.vehicleType || '无车型';
                 const safeRouteName = record.routeName || '无路线';
-                const fileName = `派车单-${shipmentId}-${poNumber}-${pickupDate}-${safeRouteName}`;
+                const fileName = `派车单-${identifier}-${pickupDate}-${vehicleType}-${safeRouteName}`;
                 
                 const oldTitle = document.title;
                 document.title = fileName;
@@ -1601,6 +1770,30 @@
                 });
             };
 
+            const handleSelectByDateRange = (dates) => {
+                setDateRange(dates);
+                if (!dates || dates.length !== 2) return;
+                
+                const [start, end] = dates;
+                const startDate = start.startOf('day');
+                const endDate = end.endOf('day');
+
+                const keysToSelect = orders.filter(o => {
+                    if (!o.pickupDate) return false;
+                    const pickup = dayjs(o.pickupDate);
+                    return pickup.isAfter(startDate) && pickup.isBefore(endDate) || pickup.isSame(startDate, 'day') || pickup.isSame(endDate, 'day');
+                }).map(o => o.id);
+
+                if (keysToSelect.length > 0) {
+                    // 合并已有选择和新选择
+                    const newSelectedKeys = [...new Set([...selectedRowKeys, ...keysToSelect])];
+                    setSelectedRowKeys(newSelectedKeys);
+                    message.success(`已自动勾选符合日期范围的 ${keysToSelect.length} 条订单`);
+                } else {
+                    message.info('该日期范围内没有找到相关订单');
+                }
+            };
+
             const toggleExportStatus = (record) => {
                 const newOrders = orders.map(o => {
                     if (o.id === record.id) {
@@ -1738,6 +1931,12 @@
                                 />
                             </div>
                             <Space>
+                                <DatePicker.RangePicker 
+                                    value={dateRange}
+                                    onChange={handleSelectByDateRange}
+                                    placeholder={['选择提货开始日期', '选择提货结束日期']}
+                                    style={{ width: 300 }}
+                                />
                                 <Button onClick={handleExport} icon={<span>📊</span>}>
                                     导出Excel
                                 </Button>
@@ -1759,6 +1958,7 @@
                             rowKey="id" 
                             pagination={{ pageSize: 10 }} 
                             scroll={{ x: 800 }}
+                            rowClassName={(record) => record.id === highlightedOrderId ? 'highlighted-row' : ''}
                         />
                     </Card>
                 </div>
@@ -1766,16 +1966,48 @@
         };
 
         // 6. 总览/仪表盘组件 (新增)
-        const Overview = ({ onNavigate }) => {
+        const Overview = ({ onNavigate, onHighlightOrder }) => {
             const [orders, setOrders] = useState([]);
             const [pendingDispatch, setPendingDispatch] = useState([]);
             const [inTransit, setInTransit] = useState([]);
+            const [stats, setStats] = useState({ totalOrders: 0, currentMonthOrders: 0, topFleets: [] });
 
             useEffect(() => {
                 const allOrders = getOrders();
                 setOrders(allOrders);
                 processOrders(allOrders);
+                calculateStats(allOrders);
             }, []);
+
+            const calculateStats = (data) => {
+                const currentMonth = dayjs().startOf('month');
+                let currentMonthCount = 0;
+                const fleetCounts = {};
+
+                data.forEach(order => {
+                    // 本月订单数
+                    if (order.createdAt && dayjs(order.createdAt).isAfter(currentMonth)) {
+                        currentMonthCount++;
+                    }
+                    
+                    // 车队使用次数统计
+                    if (order.fleet) {
+                        fleetCounts[order.fleet] = (fleetCounts[order.fleet] || 0) + 1;
+                    }
+                });
+
+                // 取前三名常用车队
+                const topFleets = Object.entries(fleetCounts)
+                    .sort(([, a], [, b]) => b - a)
+                    .slice(0, 3)
+                    .map(([name, count]) => ({ name, count }));
+
+                setStats({
+                    totalOrders: data.length,
+                    currentMonthOrders: currentMonthCount,
+                    topFleets
+                });
+            };
 
             const processOrders = (data) => {
                 const today = dayjs().startOf('day');
@@ -1859,7 +2091,10 @@
                     title: '操作',
                     key: 'action',
                     render: (_, record) => (
-                        <Button type="link" size="small" onClick={() => onNavigate('5')}>查看详情</Button>
+                        <Button type="link" size="small" onClick={() => {
+                            onNavigate('5');
+                            if (onHighlightOrder) onHighlightOrder(record.id);
+                        }}>查看详情</Button>
                     )
                 }
             ];
@@ -1934,6 +2169,7 @@
             const [activeTab, setActiveTab] = useState('0');
             const [editingRoute, setEditingRoute] = useState(null);
             const [editingOrder, setEditingOrder] = useState(null);
+            const [highlightedOrderId, setHighlightedOrderId] = useState(null);
 
             useEffect(() => {
                 setAddresses(getAddresses());
@@ -2006,7 +2242,13 @@
                 {
                     key: '0',
                     label: <span style={{fontSize: 16}}>📊 总览</span>,
-                    children: <Overview onNavigate={setActiveTab} />,
+                    children: <Overview 
+                        onNavigate={setActiveTab} 
+                        onHighlightOrder={(id) => {
+                            setHighlightedOrderId(id);
+                            setTimeout(() => setHighlightedOrderId(null), 3000);
+                        }}
+                    />,
                 },
                 {
                     key: '4',
@@ -2025,6 +2267,7 @@
                     children: <OrderManagement 
                         addresses={addresses}
                         onEditOrder={handleEditOrder}
+                        highlightedOrderId={highlightedOrderId}
                     />,
                 },
                 {
