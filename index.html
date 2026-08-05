@@ -452,7 +452,7 @@
                     
                     // 自动填充表单
                     const currentValues = form.getFieldsValue();
-                    form.setFieldsValue({
+                    const updates = {
                         cargoDescription: route.cargo?.description,
                         cargoCount: route.cargo?.count,
                         cargoCbm: route.cargo?.cbm,
@@ -460,8 +460,19 @@
                         note: route.cargo?.note,
                         fleet: currentValues.fleet || route.fleet,
                         vehicleType: currentValues.vehicleType || route.vehicleType
-                    });
-                    message.success('已自动加载线路信息');
+                    };
+
+                    if (typeof route.transitDays === 'number' && currentValues.pickupDate) {
+                        updates.deliveryDate = dayjs(currentValues.pickupDate).add(route.transitDays, 'day');
+                    }
+
+                    form.setFieldsValue(updates);
+
+                    if (typeof route.transitDays === 'number' && currentValues.pickupDate) {
+                        message.success(`已自动加载线路信息，并根据时效(+${route.transitDays}天)设置送货日期`);
+                    } else {
+                        message.success('已自动加载线路信息');
+                    }
                 }
             };
 
@@ -542,6 +553,19 @@
                 setCurrentStops([]);
                 setPrintData(null);
                 message.success('已重置');
+            };
+
+            const handlePickupDateChange = (date) => {
+                if (!date) return;
+                const currentRouteId = form.getFieldValue('routeSelect');
+                if (!currentRouteId) return;
+                
+                const route = routes.find(r => r.id === currentRouteId);
+                if (route && typeof route.transitDays === 'number') {
+                    const newDeliveryDate = date.add(route.transitDays, 'day');
+                    form.setFieldsValue({ deliveryDate: newDeliveryDate });
+                    message.success(`已根据路线时效(+${route.transitDays}天)自动设置送货日期`);
+                }
             };
 
             const handleDeleteFleet = (fleetValue) => {
@@ -803,7 +827,7 @@
                                         style={{ marginBottom: 0 }}
                                         rules={[{ required: true, message: '请选择提货日期' }]}
                                     >
-                                        <DatePicker size="large" variant="filled" style={{width: '100%'}} placeholder="选择提货日期" />
+                                        <DatePicker size="large" variant="filled" style={{width: '100%'}} placeholder="选择提货日期" onChange={handlePickupDateChange} />
                                     </Form.Item>
                                     <Form.Item 
                                         name="deliveryDate" 
@@ -1115,13 +1139,14 @@
             });
 
             // 如果处于编辑模式，初始化表单和状态
-            useEffect(() => {
-                if (editingRoute) {
-                    form.setFieldsValue({ 
-                        routeName: editingRoute.name,
-                        fleet: editingRoute.fleet,
-                        vehicleType: editingRoute.vehicleType
-                    });
+                useEffect(() => {
+                    if (editingRoute) {
+                        form.setFieldsValue({ 
+                            routeName: editingRoute.name,
+                            fleet: editingRoute.fleet,
+                            vehicleType: editingRoute.vehicleType,
+                            transitDays: editingRoute.transitDays
+                        });
                     setStops(editingRoute.stops.map((s, i) => ({ 
                         key: Date.now() + i, 
                         addressId: s.addressId,
@@ -1231,6 +1256,7 @@
                         name: values.routeName,
                         fleet: values.fleet,
                         vehicleType: values.vehicleType,
+                        transitDays: values.transitDays,
                         // 新的数据结构：站点包含地址ID和类型
                         stops: stops.map(s => ({
                             addressId: s.addressId,
@@ -1280,7 +1306,7 @@
                             <Form.Item name="routeName" label={<span style={{ fontWeight: 'bold', color: '#374151' }}>路线模板名称</span>} rules={[{ required: true, message: '请输入路线名称' }]}>
                                 <Input size="large" placeholder="例如：2023-10-27 深圳-东莞-惠州 拼车" variant="filled" style={{fontSize: 16}} />
                             </Form.Item>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
                                 <Form.Item name="fleet" label="默认承运车队 (选填)">
                                     <AutoComplete
                                         options={fleets.map(f => ({ value: f.value }))}
@@ -1294,6 +1320,9 @@
                                 </Form.Item>
                                 <Form.Item name="vehicleType" label="默认车型偏好 (选填)">
                                     <Input size="large" variant="filled" placeholder="例如：2台5吨车 / 40HQ" />
+                                </Form.Item>
+                                <Form.Item name="transitDays" label="默认时效 (天数, 选填)">
+                                    <InputNumber size="large" variant="filled" style={{width: '100%'}} min={0} placeholder="例如：1、2" />
                                 </Form.Item>
                             </div>
                         </Form>
@@ -1474,6 +1503,9 @@
         // 3. 线路管理组件
         const RouteManagement = ({ routes, addresses, setRoutes, setActiveTab, setEditingRoute }) => {
             const [searchText, setSearchText] = useState('');
+            const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+            const [isBatchModalVisible, setIsBatchModalVisible] = useState(false);
+            const [batchForm] = Form.useForm();
 
             // 获取最新地址信息的帮助函数
             const getAddressDetails = (addressId) => addresses.find(a => a.id === addressId) || {};
@@ -1504,7 +1536,12 @@
                     key: 'name',
                     render: (text, record) => (
                         <div>
-                            <div style={{fontWeight: 'bold', fontSize: 15}}>{text}</div>
+                            <div style={{fontWeight: 'bold', fontSize: 15}}>
+                                {text} 
+                                {typeof record.transitDays === 'number' && (
+                                    <Tag color="blue" style={{marginLeft: 8, fontSize: 12}}>时效: +{record.transitDays}天</Tag>
+                                )}
+                            </div>
                             <div style={{fontSize: 12, color: '#888'}}>{new Date(record.createdAt).toLocaleDateString()}</div>
                         </div>
                     )
@@ -1593,6 +1630,49 @@
                 );
             };
 
+            const rowSelection = {
+                selectedRowKeys,
+                onChange: (newSelectedRowKeys) => {
+                    setSelectedRowKeys(newSelectedRowKeys);
+                }
+            };
+
+            const handleBatchEditSubmit = () => {
+                batchForm.validateFields().then(values => {
+                    // Check if everything is empty
+                    const hasChanges = Object.values(values).some(val => val !== undefined && val !== '' && val !== null);
+                    if (!hasChanges) {
+                        message.warning('请填写需要修改的字段');
+                        return;
+                    }
+                    
+                    const newRoutes = routes.map(route => {
+                        if (selectedRowKeys.includes(route.id)) {
+                            const updatedRoute = { ...route };
+                            if (values.transitDays !== undefined && values.transitDays !== null) updatedRoute.transitDays = values.transitDays;
+                            if (values.fleet !== undefined && values.fleet !== '') updatedRoute.fleet = values.fleet;
+                            if (values.vehicleType !== undefined && values.vehicleType !== '') updatedRoute.vehicleType = values.vehicleType;
+                            
+                            if ((values.cargoDescription !== undefined && values.cargoDescription !== '') || 
+                                (values.cargoNote !== undefined && values.cargoNote !== '')) {
+                                updatedRoute.cargo = { ...(updatedRoute.cargo || {}) };
+                                if (values.cargoDescription !== undefined && values.cargoDescription !== '') updatedRoute.cargo.description = values.cargoDescription;
+                                if (values.cargoNote !== undefined && values.cargoNote !== '') updatedRoute.cargo.note = values.cargoNote;
+                            }
+                            return updatedRoute;
+                        }
+                        return route;
+                    });
+                    
+                    setRoutes(newRoutes);
+                    saveRoutes(newRoutes);
+                    message.success(`已成功批量修改 ${selectedRowKeys.length} 条路线`);
+                    setIsBatchModalVisible(false);
+                    setSelectedRowKeys([]);
+                    batchForm.resetFields();
+                });
+            };
+
             return (
                 <div>
                     <Card bordered={false} style={{ marginBottom: 24, boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
@@ -1612,9 +1692,21 @@
                                     allowClear
                                 />
                             </div>
+                            <div>
+                                {selectedRowKeys.length > 0 && (
+                                    <Button 
+                                        type="primary" 
+                                        onClick={() => setIsBatchModalVisible(true)}
+                                        size="large"
+                                    >
+                                        批量修改 ({selectedRowKeys.length})
+                                    </Button>
+                                )}
+                            </div>
                         </div>
 
                         <Table 
+                            rowSelection={rowSelection}
                             columns={columns} 
                             dataSource={filteredRoutes} 
                             rowKey="id"
@@ -1623,6 +1715,48 @@
                             locale={{ emptyText: <Empty description="暂无路线数据" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
                         />
                     </Card>
+
+                    <Modal
+                        title={
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: '1.5rem' }}>🛠️</span>
+                                <span>批量修改路线</span>
+                            </div>
+                        }
+                        open={isBatchModalVisible}
+                        onOk={handleBatchEditSubmit}
+                        onCancel={() => {
+                            setIsBatchModalVisible(false);
+                            batchForm.resetFields();
+                        }}
+                        okText="确认修改"
+                        cancelText="取消"
+                        width={600}
+                        destroyOnClose
+                    >
+                        <div style={{ marginBottom: 24, color: '#4b5563', backgroundColor: '#f3f4f6', padding: 12, borderRadius: 8 }}>
+                            已选择 <b>{selectedRowKeys.length}</b> 条路线。请填写需要批量更新的字段 <b>(留空表示不修改原数据)</b>：
+                        </div>
+                        <Form form={batchForm} layout="vertical">
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                <Form.Item name="transitDays" label="默认时效 (天数)">
+                                    <InputNumber style={{width: '100%'}} min={0} placeholder="留空不修改" size="large" variant="filled" />
+                                </Form.Item>
+                                <Form.Item name="fleet" label="默认承运车队">
+                                    <Input placeholder="留空不修改" size="large" variant="filled" />
+                                </Form.Item>
+                                <Form.Item name="vehicleType" label="默认车型偏好">
+                                    <Input placeholder="留空不修改" size="large" variant="filled" />
+                                </Form.Item>
+                                <Form.Item name="cargoDescription" label="货物名称/描述">
+                                    <Input placeholder="留空不修改" size="large" variant="filled" />
+                                </Form.Item>
+                            </div>
+                            <Form.Item name="cargoNote" label="货物/操作备注">
+                                <Input.TextArea rows={4} placeholder="留空不修改，输入内容将覆盖原备注" size="large" variant="filled" />
+                            </Form.Item>
+                        </Form>
+                    </Modal>
                 </div>
             );
         };
