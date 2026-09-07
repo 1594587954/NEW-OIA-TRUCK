@@ -473,6 +473,33 @@
                     } else {
                         message.success('已自动加载线路信息');
                     }
+
+                    // Check for internal precautions
+                    const precautionsList = [];
+                    route.stops.forEach(s => {
+                        const addr = addresses.find(a => a.id === s.addressId);
+                        if (addr && addr.precautions) {
+                            precautionsList.push({ name: addr.name, text: addr.precautions });
+                        }
+                    });
+
+                    if (precautionsList.length > 0) {
+                        Modal.warning({
+                            title: '⚠️ 内部注意事项提醒',
+                            content: (
+                                <div style={{marginTop: 16}}>
+                                    <p style={{marginBottom: 8, color: '#666'}}>此路线包含以下需要特别注意的地址：</p>
+                                    <ul style={{ paddingLeft: 20, margin: 0 }}>
+                                        {precautionsList.map((p, idx) => (
+                                            <li key={idx} style={{marginBottom: 8}}><strong>{p.name}:</strong> <span style={{color: '#cf1322'}}>{p.text}</span></li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ),
+                            okText: '已了解',
+                            width: 500
+                        });
+                    }
                 }
             };
 
@@ -541,6 +568,18 @@
                             message.info(`已自动添加地址备注: ${addr.note}`);
                         }
                     }
+
+                    if (addr.precautions) {
+                        Modal.warning({
+                            title: `⚠️ 内部注意事项提醒 - ${addr.name}`,
+                            content: (
+                                <div style={{marginTop: 16, color: '#cf1322', fontSize: 16}}>
+                                    {addr.precautions}
+                                </div>
+                            ),
+                            okText: '已了解'
+                        });
+                    }
                 }
                 setCurrentStops(newStops);
             };
@@ -567,6 +606,11 @@
                     message.success(`已根据路线时效(+${route.transitDays}天)自动设置送货日期`);
                 }
             };
+
+            const activePrecautions = currentStops
+                .map(s => addresses.find(a => a.id === s.addressId))
+                .filter(a => a && a.precautions)
+                .map(a => ({ name: a.name, text: a.precautions }));
 
             const handleDeleteFleet = (fleetValue) => {
                 const newFleets = fleets.filter(f => f.value !== fleetValue);
@@ -930,6 +974,19 @@
                                     <Button type="dashed" onClick={handleAddStop} block size="large" icon={<span style={{marginRight: 8}}>+</span>}>
                                         添加站点
                                     </Button>
+
+                                    {activePrecautions.length > 0 && (
+                                        <div style={{ marginTop: 16, padding: 16, backgroundColor: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 8 }}>
+                                            <div style={{ fontWeight: 'bold', color: '#d46b08', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <span style={{ fontSize: '1.2rem' }}>⚠️</span> 内部注意事项 (仅内部可见)
+                                            </div>
+                                            <ul style={{ margin: 0, paddingLeft: 20, color: '#cf1322' }}>
+                                                {activePrecautions.map((p, idx) => (
+                                                    <li key={idx} style={{ marginBottom: 4 }}><strong>{p.name}:</strong> {p.text}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <Divider orientation="left">货物信息</Divider>
@@ -985,6 +1042,11 @@
             const [editingId, setEditingId] = useState(null);
             const [form] = Form.useForm();
             const [searchText, setSearchText] = useState('');
+            
+            // Batch edit state
+            const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+            const [isBatchModalVisible, setIsBatchModalVisible] = useState(false);
+            const [batchForm] = Form.useForm();
 
             const columns = [
                 { title: '名称', dataIndex: 'name', key: 'name', render: t => <Text strong>{t}</Text> },
@@ -992,6 +1054,7 @@
                 { title: '联系人', dataIndex: 'contactPerson', key: 'contactPerson' },
                 { title: '联系方式', dataIndex: 'contactInfo', key: 'contactInfo' },
                 { title: '备注', dataIndex: 'note', key: 'note', render: t => t ? <Text type="secondary" ellipsis={{tooltip:t}} style={{maxWidth: 150}}>{t}</Text> : '-' },
+                { title: '内部注意事项', dataIndex: 'precautions', key: 'precautions', render: t => t ? <Text type="danger" ellipsis={{tooltip:t}} style={{maxWidth: 150}}>⚠️ {t}</Text> : '-' },
                 {
                     title: '操作',
                     key: 'action',
@@ -1044,6 +1107,42 @@
                 });
             };
 
+            const rowSelection = {
+                selectedRowKeys,
+                onChange: (newSelectedRowKeys) => {
+                    setSelectedRowKeys(newSelectedRowKeys);
+                }
+            };
+
+            const handleBatchEditSubmit = () => {
+                batchForm.validateFields().then(values => {
+                    const hasChanges = Object.values(values).some(val => val !== undefined && val !== '' && val !== null);
+                    if (!hasChanges) {
+                        message.warning('请填写需要修改的字段');
+                        return;
+                    }
+                    
+                    const newAddresses = addresses.map(addr => {
+                        if (selectedRowKeys.includes(addr.id)) {
+                            const updatedAddr = { ...addr };
+                            if (values.contactPerson !== undefined && values.contactPerson !== '') updatedAddr.contactPerson = values.contactPerson;
+                            if (values.contactInfo !== undefined && values.contactInfo !== '') updatedAddr.contactInfo = values.contactInfo;
+                            if (values.note !== undefined && values.note !== '') updatedAddr.note = values.note;
+                            if (values.precautions !== undefined && values.precautions !== '') updatedAddr.precautions = values.precautions;
+                            return updatedAddr;
+                        }
+                        return addr;
+                    });
+                    
+                    setAddresses(newAddresses);
+                    saveAddresses(newAddresses);
+                    message.success(`已成功批量修改 ${selectedRowKeys.length} 个地址`);
+                    setIsBatchModalVisible(false);
+                    setSelectedRowKeys([]);
+                    batchForm.resetFields();
+                });
+            };
+
             return (
                 <div>
                     <Card bordered={false} style={{ boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
@@ -1063,18 +1162,32 @@
                                     allowClear
                                 />
                             </div>
-                            <Button 
-                                type="primary" 
-                                icon={<span>+</span>} 
-                                onClick={() => { setEditingId(null); form.resetFields(); setIsModalOpen(true); }}
-                                size="large"
-                                shape="round"
-                                style={{ boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}
-                            >
-                                新增地址
-                            </Button>
+                            <Space>
+                                {selectedRowKeys.length > 0 && (
+                                    <Button 
+                                        type="primary" 
+                                        onClick={() => setIsBatchModalVisible(true)}
+                                        size="large"
+                                        shape="round"
+                                        style={{ boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}
+                                    >
+                                        批量修改 ({selectedRowKeys.length})
+                                    </Button>
+                                )}
+                                <Button 
+                                    type="primary" 
+                                    icon={<span>+</span>} 
+                                    onClick={() => { setEditingId(null); form.resetFields(); setIsModalOpen(true); }}
+                                    size="large"
+                                    shape="round"
+                                    style={{ boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}
+                                >
+                                    新增地址
+                                </Button>
+                            </Space>
                         </div>
                         <Table 
+                            rowSelection={rowSelection}
                             columns={columns} 
                             dataSource={filteredAddresses} 
                             rowKey="id"
@@ -1083,6 +1196,45 @@
                             scroll={{ x: 800 }}
                         />
                     </Card>
+
+                    <Modal
+                        title={
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: '1.5rem' }}>🛠️</span>
+                                <span>批量修改地址</span>
+                            </div>
+                        }
+                        open={isBatchModalVisible}
+                        onOk={handleBatchEditSubmit}
+                        onCancel={() => {
+                            setIsBatchModalVisible(false);
+                            batchForm.resetFields();
+                        }}
+                        okText="确认修改"
+                        cancelText="取消"
+                        width={600}
+                        destroyOnClose
+                    >
+                        <div style={{ marginBottom: 24, color: '#4b5563', backgroundColor: '#f3f4f6', padding: 12, borderRadius: 8 }}>
+                            已选择 <b>{selectedRowKeys.length}</b> 个地址。请填写需要批量更新的字段 <b>(留空表示不修改原数据)</b>：
+                        </div>
+                        <Form form={batchForm} layout="vertical">
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                <Form.Item name="contactPerson" label="联系人">
+                                    <Input placeholder="留空不修改" size="large" variant="filled" />
+                                </Form.Item>
+                                <Form.Item name="contactInfo" label="联系方式">
+                                    <Input placeholder="留空不修改" size="large" variant="filled" />
+                                </Form.Item>
+                            </div>
+                            <Form.Item name="note" label="默认备注">
+                                <Input.TextArea rows={3} placeholder="留空不修改，输入内容将覆盖原备注" size="large" variant="filled" />
+                            </Form.Item>
+                            <Form.Item name="precautions" label="内部注意事项">
+                                <Input.TextArea rows={3} placeholder="留空不修改，输入内容将覆盖原注意事项" size="large" variant="filled" />
+                            </Form.Item>
+                        </Form>
+                    </Modal>
 
                     <Modal
                         title={editingId ? "编辑地址" : "新增地址"}
@@ -1111,6 +1263,9 @@
                             </div>
                             <Form.Item name="note" label="默认备注 (会自动合并到路线规划中)">
                                 <Input.TextArea rows={3} variant="filled" placeholder="例如：进门需要登记，车辆限高4米等" />
+                            </Form.Item>
+                            <Form.Item name="precautions" label="内部注意事项 (仅内部可见，自动提醒)">
+                                <Input.TextArea rows={3} variant="filled" placeholder="例如：只能下午3点后送货、不要走某某高速..." />
                             </Form.Item>
                         </Form>
                     </Modal>
