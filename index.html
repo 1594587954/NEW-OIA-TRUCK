@@ -16,8 +16,8 @@
     </script>
 
     <!-- 1. 加载 React 基础库 (本地化) -->
-    <script crossorigin src="./lib/react.production.min.js"></script>
-    <script crossorigin src="./lib/react-dom.production.min.js"></script>
+    <script src="./lib/react.production.min.js"></script>
+    <script src="./lib/react-dom.production.min.js"></script>
     
     <!-- 2. 加载 Babel (本地化) -->
     <script src="./lib/babel.min.js"></script>
@@ -33,11 +33,14 @@
     <script src="https://cdn.staticfile.org/xlsx/0.18.5/xlsx.full.min.js"></script>
     
     <style>
+        html { overflow-x: hidden; }
         body { 
-            padding: 20px; 
-            background: linear-gradient(135deg, #f0f2f5 0%, #e6f7ff 100%); /* 柔和的渐变背景 */
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
+            padding: 18px; 
+            background: linear-gradient(160deg, #f7f9fc 0%, #eef2f8 45%, #eaf0f7 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', Roboto, 'Microsoft YaHei', sans-serif; 
             min-height: 100vh;
+            color: #1f2937;
+            overflow-x: hidden;
         }
         .container { 
             max-width: 1200px; 
@@ -98,6 +101,68 @@
             0% { background-color: #fffbe6; }
             50% { background-color: #fffbe6; }
             100% { background-color: transparent; }
+        }
+
+        /* 总览页状态胶囊 / 订单行 的交互反馈 */
+        .stat-chip { transition: box-shadow .18s ease, transform .18s ease, background .18s ease; }
+        .stat-chip.clickable:hover { box-shadow: 0 6px 16px rgba(15,23,42,0.12); transform: translateY(-1px); background: #fff; }
+        .order-row { transition: box-shadow .18s ease, transform .18s ease, border-color .18s ease, background .18s ease; }
+        .order-row:hover { background: #fff; border-color: #e2e8f0; box-shadow: 0 6px 16px rgba(15,23,42,0.07); transform: translateY(-1px); }
+        .tbl-row { transition: background .16s ease; }
+        .tbl-row:hover { background: #f7fafe !important; }
+        .filter-bar { border-radius: 10px !important; }
+        .filter-bar:focus-within { border-color: #bfdbfe !important; box-shadow: 0 0 0 3px rgba(22,119,255,0.08); }
+        .toolbar-btn { border-radius: 10px !important; }
+
+        /* ===== 焕然一新：左侧导航 + 主区卡片（配色仍为蓝色主题） ===== */
+        .app-shell { max-width: 1320px; margin: 0 auto; display: flex; gap: 18px; align-items: flex-start; }
+        .app-side {
+            width: 196px; flex: 0 0 196px; background: #fff; border-radius: 18px;
+            border: 1px solid #eef1f5; box-shadow: 0 4px 18px rgba(31,41,55,0.05);
+            padding: 14px 12px; position: sticky; top: 18px;
+        }
+        .app-brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 13px; border-bottom: 1px solid #f2f4f8; margin-bottom: 10px; }
+        .app-brand-mark {
+            width: 34px; height: 34px; border-radius: 11px; flex: 0 0 34px;
+            background: linear-gradient(135deg, #1677ff 0%, #52a0ff 100%);
+            display: inline-flex; align-items: center; justify-content: center; font-size: 17px;
+            box-shadow: 0 4px 10px rgba(22,119,255,0.25);
+        }
+        .app-brand-title { font-size: 15px; font-weight: 800; color: #1f2937; line-height: 1.25; }
+        .app-brand-sub { font-size: 11px; color: #9aa3af; letter-spacing: 2px; }
+        .app-nav { display: flex; flex-direction: column; gap: 3px; }
+        .app-nav-item {
+            position: relative; display: flex; align-items: center; padding: 9px 12px;
+            border-radius: 11px; cursor: pointer; color: #5b6472; font-size: 14px; font-weight: 600;
+            transition: background .16s ease, color .16s ease; user-select: none;
+        }
+        .app-nav-item:hover { background: #f4f7fb; color: #1677ff; }
+        .app-nav-item.active { background: #eaf2ff; color: #1677ff; font-weight: 700; }
+        .app-nav-item.active::before {
+            content: ''; position: absolute; left: 0; top: 10px; bottom: 10px;
+            width: 3px; border-radius: 0 3px 3px 0; background: #1677ff;
+        }
+        .app-side-foot { margin-top: 13px; padding-top: 12px; border-top: 1px solid #f2f4f8; display: flex; flex-direction: column; gap: 8px; }
+        .side-btn { border-radius: 11px !important; font-size: 13px !important; font-weight: 600 !important; }
+        .app-main { flex: 1; min-width: 0; }
+        .app-page-head { display: flex; align-items: baseline; gap: 10px; padding: 0 4px 14px; }
+        .app-page-title { font-size: 20px; font-weight: 800; color: #1f2937; letter-spacing: .5px; }
+
+        /* 控件圆角统一（蓝色主题不变） */
+        .ant-btn { border-radius: 10px !important; font-weight: 600; }
+        .ant-btn-primary { box-shadow: 0 4px 12px rgba(22,119,255,0.22) !important; }
+        .ant-card { border-radius: 16px !important; box-shadow: 0 2px 12px rgba(31,41,55,0.05) !important; border-color: #eef1f5 !important; }
+        .ant-table-thead > tr > th { background: #fafbfd !important; color: #8a93a2 !important; font-weight: 600 !important; font-size: 13px !important; }
+        .ant-table-tbody > tr:hover > td { background: #f7fafe !important; }
+        .ant-input, .ant-input-number, .ant-picker, .ant-select-selector, .ant-input-affix-wrapper { border-radius: 10px !important; }
+        .ant-modal-content { border-radius: 18px !important; }
+        .ant-tag { border-radius: 999px !important; font-weight: 600; }
+        .ant-pagination-item { border-radius: 10px !important; }
+        .ant-segmented { border-radius: 12px !important; }
+        @media (max-width: 900px) {
+            .app-shell { flex-direction: column; }
+            .app-side { width: 100%; flex: none; position: static; }
+            .app-nav { flex-direction: row; flex-wrap: wrap; }
         }
     </style>
 </head>
@@ -374,6 +439,9 @@
             const [draggedIndex, setDraggedIndex] = useState(null);
             const [printData, setPrintData] = useState(null);
             const [fleets, setFleets] = useState([]);
+            const [isPreOrder, setIsPreOrder] = useState(false);
+            // true 表示提醒日期仍由提货日期自动推算；用户手动改过后置 false
+            const reminderAutoRef = React.useRef(true);
 
             // 加载车队历史记录
             useEffect(() => {
@@ -383,13 +451,18 @@
             // 监听编辑状态
             useEffect(() => {
                 if (editingOrder) {
+                    setIsPreOrder(!!editingOrder.isPreOrder);
                     fillFormFromOrder(editingOrder);
                 }
             }, [editingOrder, form, routes]);
 
             const fillFormFromOrder = (order) => {
+                // 编辑已有预定单时保留其提醒日期；没有则继续保持自动推算
+                reminderAutoRef.current = !order.reminderDate;
                 // 填充表单
                 form.setFieldsValue({
+                    isPreOrder: !!order.isPreOrder,
+                    reminderDate: order.reminderDate ? dayjs(order.reminderDate) : null,
                     routeSelect: order.routeSelect, // 尝试保留选择状态
                     shipmentId: order.shipmentId,
                     poNumber: order.poNumber,
@@ -591,11 +664,34 @@
                 setSelectedRoute(null);
                 setCurrentStops([]);
                 setPrintData(null);
+                setIsPreOrder(false);
+                reminderAutoRef.current = true; // 重置后提醒日期恢复自动推算
                 message.success('已重置');
+            };
+
+            // 预定单提醒日期规则：提货日期前 1 天，遇周末自动提前到最近的周五（与总览「准备派车」口径一致）
+            const getDefaultReminderDate = (pickupDate) => {
+                if (!pickupDate) return null;
+                let d = dayjs(pickupDate).startOf('day').subtract(1, 'day');
+                if (d.day() === 6) d = d.subtract(1, 'day');      // 周六 -> 周五
+                else if (d.day() === 0) d = d.subtract(2, 'day'); // 周日 -> 周五
+                return d;
+            };
+
+            // 提货日期变化时自动带出提醒日期（仅当用户没有手动改过）
+            const applyAutoReminderDate = (pickupDate) => {
+                if (!form.getFieldValue('isPreOrder') || !pickupDate) return;
+                if (!reminderAutoRef.current) return;
+                const auto = getDefaultReminderDate(pickupDate);
+                if (auto) form.setFieldsValue({ reminderDate: auto });
             };
 
             const handlePickupDateChange = (date) => {
                 if (!date) return;
+
+                // 预定单：提醒日期默认取提货日期前 1~2 天（自动跳过周末）
+                applyAutoReminderDate(date);
+
                 const currentRouteId = form.getFieldValue('routeSelect');
                 if (!currentRouteId) return;
                 
@@ -633,6 +729,8 @@
 
                     const data = {
                         ...values,
+                        isDraft: false,
+                        reminderDate: values.reminderDate ? values.reminderDate.toISOString() : null,
                         stops: currentStops.map(s => ({
                             addressId: s.addressId,
                             type: s.type || 'logistics'
@@ -660,8 +758,14 @@
                             ...data
                         };
                         saveOrders([newOrder, ...orders]); // 新订单排在最前
-                        message.success('已自动保存到订单记录');
+                        message.success(values.isPreOrder ? '已保存为预定单' : '已自动保存到订单记录');
+                        if (values.isPreOrder && onOrderComplete) {
+                            onOrderComplete();
+                            return; // 预定单不打印
+                        }
                     }
+
+                    if (values.isPreOrder) return; // 预定单编辑保存后也不打印
 
                     // 构造文件名: 派车单-单号(Shipment优先)-提货日期-车型-路线名称
                     const identifier = values.shipmentId || values.poNumber || '无单号';
@@ -685,6 +789,50 @@
                         }, 1000);
                     }, 100);
                 });
+            };
+
+            const handleSaveDraft = () => {
+                const values = form.getFieldsValue(true);
+                const routeId = values.routeSelect;
+                const routeName = routeId
+                    ? (routes.find(r => r.id === routeId)?.name || selectedRoute?.name || '')
+                    : (selectedRoute?.name || '');
+
+                // 保存新输入的承运车队 (与正式单保持一致)
+                const newFleet = values.fleet;
+                if (newFleet && !fleets.some(f => f.value === newFleet)) {
+                    const updatedFleets = [...fleets, { value: newFleet }];
+                    setFleets(updatedFleets);
+                    saveFleets(updatedFleets);
+                }
+
+                const now = new Date().toISOString();
+                const data = {
+                    ...values,
+                    isDraft: true,
+                    reminderDate: values.reminderDate ? values.reminderDate.toISOString() : null,
+                    stops: currentStops.map(s => ({
+                        addressId: s.addressId,
+                        type: s.type || 'logistics'
+                    })),
+                    routeName: routeName
+                };
+
+                const orders = getOrders();
+                if (editingOrder) {
+                    const updatedOrders = orders.map(o => o.id === editingOrder.id ? { ...o, ...data, isDraft: true, updatedAt: now } : o);
+                    saveOrders(updatedOrders);
+                    message.success('草稿已更新');
+                } else {
+                    const newOrder = {
+                        id: Date.now().toString(),
+                        createdAt: now,
+                        updatedAt: now,
+                        ...data
+                    };
+                    saveOrders([newOrder, ...orders]);
+                    message.success('已保存为草稿，可在「订单记录」继续完善');
+                }
             };
 
             const handleParseText = (text) => {
@@ -756,7 +904,7 @@
                         </div>
                         
                         <Form form={form} layout="vertical">
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16, alignItems: 'start' }}>
                                 <Form.Item name="routeSelect" label="选择线路" required style={{ marginBottom: 0 }}>
                                     <Select 
                                         showSearch
@@ -774,6 +922,48 @@
                                         ))}
                                     </Select>
                                 </Form.Item>
+                                <Form.Item
+                                    name="isPreOrder"
+                                    label="单据类型"
+                                    style={{ marginBottom: 0 }}
+                                    initialValue={false}
+                                    extra={isPreOrder ? <span style={{ fontSize: 12, color: '#d4380d' }}>先登记，暂不派车</span> : null}
+                                >
+                                    <antd.Segmented
+                                        block
+                                        size="large"
+                                        options={[
+                                            { label: '📄 正式派车单', value: false },
+                                            { label: '⏰ 预定单', value: true }
+                                        ]}
+                                        onChange={(val) => {
+                                            const pre = !!val;
+                                            setIsPreOrder(pre);
+                                            // 切到预定单时，若已填提货日期则自动带出提醒日期
+                                            if (pre) {
+                                                if (!form.getFieldValue('reminderDate')) reminderAutoRef.current = true;
+                                                applyAutoReminderDate(form.getFieldValue('pickupDate'));
+                                            }
+                                        }}
+                                    />
+                                </Form.Item>
+                                {isPreOrder && (
+                                    <Form.Item
+                                        name="reminderDate"
+                                        label="提醒派车日期"
+                                        rules={[{ required: true, message: '请选择提醒日期' }]}
+                                        style={{ marginBottom: 0 }}
+                                        extra={<span style={{ fontSize: 12, color: '#9ca3af' }}>默认按提货日提前 1~2 天自动推算，可手动修改</span>}
+                                    >
+                                        <DatePicker
+                                            size="large"
+                                            variant="filled"
+                                            style={{width: '100%'}}
+                                            placeholder="默认按提货日推算"
+                                            onChange={() => { reminderAutoRef.current = false; }}
+                                        />
+                                    </Form.Item>
+                                )}
                             </div>
 
                             <div style={{ marginTop: 0 }}>
@@ -816,7 +1006,7 @@
                                         name="fleet" 
                                         label="承运车队" 
                                         style={{ marginBottom: 0 }}
-                                        rules={[{ required: true, message: '请输入承运车队' }]}
+                                        rules={[{ required: !isPreOrder, message: '请输入承运车队' }]}
                                     >
                                         <AutoComplete
                                             options={fleets.map(f => ({
@@ -861,7 +1051,7 @@
                                         name="vehicleType" 
                                         label="车型" 
                                         style={{ marginBottom: 0 }}
-                                        rules={[{ required: true, message: '请输入车型' }]}
+                                        rules={[{ required: !isPreOrder, message: '请输入车型' }]}
                                     >
                                         <Input size="large" variant="filled" placeholder="例如：2台5吨车 / 40HQ" />
                                     </Form.Item>
@@ -869,7 +1059,7 @@
                                         name="pickupDate" 
                                         label="提货日期" 
                                         style={{ marginBottom: 0 }}
-                                        rules={[{ required: true, message: '请选择提货日期' }]}
+                                        rules={[{ required: !isPreOrder, message: '请选择提货日期' }]}
                                     >
                                         <DatePicker size="large" variant="filled" style={{width: '100%'}} placeholder="选择提货日期" onChange={handlePickupDateChange} />
                                     </Form.Item>
@@ -877,7 +1067,7 @@
                                         name="deliveryDate" 
                                         label="送货日期" 
                                         style={{ marginBottom: 0 }}
-                                        rules={[{ required: true, message: '请选择送货日期' }]}
+                                        rules={[{ required: !isPreOrder, message: '请选择送货日期' }]}
                                     >
                                         <DatePicker size="large" variant="filled" style={{width: '100%'}} placeholder="选择送货日期" />
                                     </Form.Item>
@@ -1016,15 +1206,17 @@
                                     {editingOrder ? (
                                         <>
                                             <Button size="large" onClick={onCancelEdit}>取消编辑</Button>
+                                            <Button size="large" onClick={handleSaveDraft}>💾 存为草稿</Button>
                                             <Button type="primary" size="large" style={{ boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }} onClick={handleGenerate}>
-                                                保存修改并更新记录
+                                                {isPreOrder ? '保存预定单' : '保存修改并更新记录'}
                                             </Button>
                                         </>
                                     ) : (
                                         <>
                                             <Button size="large" onClick={handleReset}>重置</Button>
+                                            <Button size="large" onClick={handleSaveDraft}>💾 保存草稿</Button>
                                             <Button type="primary" size="large" style={{ boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }} onClick={handleGenerate}>
-                                                确认生成派车单 (PDF)
+                                                {isPreOrder ? '保存预定单' : '确认生成派车单 (PDF)'}
                                             </Button>
                                         </>
                                     )}
@@ -1925,6 +2117,7 @@
             const [searchText, setSearchText] = React.useState('');
             const [selectedRowKeys, setSelectedRowKeys] = React.useState([]);
             const [dateRange, setDateRange] = React.useState(null);
+            const [statusFilter, setStatusFilter] = React.useState('all'); // all | pre | draft
 
             React.useEffect(() => {
                 setOrders(getOrders());
@@ -2194,13 +2387,16 @@
                 message.success(record.isExported ? '已标记为未导出' : '已标记为已导出');
             };
 
-            const filteredOrders = orders.filter(o => 
-                !searchText || 
+            const filteredOrders = orders.filter(o => {
+                if (statusFilter === 'pre' && !o.isPreOrder) return false;
+                if (statusFilter === 'draft' && !o.isDraft) return false;
+                
+                return !searchText || 
                 (o.shipmentId && o.shipmentId.toLowerCase().includes(searchText.toLowerCase())) ||
                 (o.poNumber && o.poNumber.toLowerCase().includes(searchText.toLowerCase())) ||
                 (o.routeName && o.routeName.toLowerCase().includes(searchText.toLowerCase())) ||
                 (o.fleet && o.fleet.toLowerCase().includes(searchText.toLowerCase()))
-            );
+            });
 
             const rowSelection = {
                 selectedRowKeys,
@@ -2209,16 +2405,36 @@
                 },
             };
 
+            const cellNowrap = { whiteSpace: 'nowrap' };
+            const statusTags = (record) => (
+                <React.Fragment>
+                    {record.isDraft && <Tag color="default" style={{ margin: '4px 0 0' }}>草稿-待完善</Tag>}
+                    {record.isPreOrder && !record.isDraft && <Tag color="warning" style={{ margin: '4px 0 0' }}>预定单-待派车</Tag>}
+                </React.Fragment>
+            );
+
             const columns = [
-                { title: 'Shipment ID', dataIndex: 'shipmentId', key: 'shipmentId' },
-                { title: 'PO 号码', dataIndex: 'poNumber', key: 'poNumber' },
-                { title: '路线名称', dataIndex: 'routeName', key: 'routeName' },
-                { title: '承运车队', dataIndex: 'fleet', key: 'fleet' },
-                { 
-                    title: '提货日期', 
-                    dataIndex: 'pickupDate', 
+                {
+                    title: 'Shipment ID', dataIndex: 'shipmentId', key: 'shipmentId', width: 150,
+                    render: (t, record) => (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                            <span style={{ fontWeight: 600, color: '#1f2937', ...cellNowrap }}>{t || '-'}</span>
+                            {statusTags(record)}
+                        </div>
+                    )
+                },
+                { title: 'PO 号码', dataIndex: 'poNumber', key: 'poNumber', width: 115, render: t => <span style={cellNowrap}>{t || '-'}</span> },
+                {
+                    title: '路线名称', dataIndex: 'routeName', key: 'routeName', width: 165,
+                    render: t => <span style={{ color: '#374151' }}>{t || '-'}</span>
+                },
+                { title: '承运车队', dataIndex: 'fleet', key: 'fleet', width: 95, render: t => t || '-' },
+                {
+                    title: '提货日期',
+                    dataIndex: 'pickupDate',
                     key: 'pickupDate',
-                    render: t => t ? dayjs(t).format('YYYY-MM-DD') : '-',
+                    width: 110,
+                    render: t => t ? <span style={cellNowrap}>{dayjs(t).format('YYYY-MM-DD')}</span> : '-',
                     sorter: (a, b) => {
                         const dateA = a.pickupDate ? dayjs(a.pickupDate).valueOf() : 0;
                         const dateB = b.pickupDate ? dayjs(b.pickupDate).valueOf() : 0;
@@ -2228,26 +2444,42 @@
                 {
                     title: '操作',
                     key: 'action',
-                    width: 380,
+                    width: 300,
                     render: (_, record) => (
-                        <Space size="small">
-                            <Button type="link" size="small" onClick={() => setViewData(record)}>
-                                🔍 查看
+                        <Space size={4} wrap>
+                            {record.isDraft && (
+                                <Button type="primary" size="small" onClick={() => onEditOrder(record)}>
+                                    继续完善
+                                </Button>
+                            )}
+                            {record.isPreOrder && !record.isDraft && (
+                                <Button type="primary" size="small" onClick={() => onEditOrder(record)}>
+                                    完善并派车
+                                </Button>
+                            )}
+                            <Button type="link" size="small" style={{ padding: '0 4px' }} onClick={() => setViewData(record)}>
+                                查看
                             </Button>
-                            <Button type="link" size="small" onClick={() => handleReprint(record)}>
-                                🖨️ 打印
-                            </Button>
-                            <Button type="link" size="small" onClick={() => onEditOrder(record)}>
-                                ✏️ 编辑
-                            </Button>
+                            {!record.isPreOrder && !record.isDraft && (
+                                <Button type="link" size="small" style={{ padding: '0 4px' }} onClick={() => handleReprint(record)}>
+                                    打印
+                                </Button>
+                            )}
+                            {!record.isPreOrder && !record.isDraft && (
+                                <Button type="link" size="small" style={{ padding: '0 4px' }} onClick={() => onEditOrder(record)}>
+                                    编辑
+                                </Button>
+                            )}
                             <Popconfirm title="确定删除？" onConfirm={() => handleDelete(record.id)}>
-                                <Button type="link" size="small" danger>删除</Button>
+                                <Button type="link" size="small" danger style={{ padding: '0 4px' }}>删除</Button>
                             </Popconfirm>
-                            <div style={{ marginLeft: 8, cursor: 'pointer' }} onClick={() => toggleExportStatus(record)}>
-                                <Tag color={record.isExported ? 'success' : 'default'} style={{ margin: 0 }}>
-                                    {record.isExported ? '已导出' : '未导出'}
-                                </Tag>
-                            </div>
+                            <Tag
+                                color={record.isExported ? 'success' : 'default'}
+                                onClick={() => toggleExportStatus(record)}
+                                style={{ margin: 0, cursor: 'pointer' }}
+                            >
+                                {record.isExported ? '已导出' : '未导出'}
+                            </Tag>
                         </Space>
                     ),
                 },
@@ -2302,110 +2534,122 @@
                         )}
                     </Modal>
 
-                    <Card bordered={false} style={{ marginBottom: 24, boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
-                        <div className="section-title" style={{ fontSize: '1.125rem', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                                <div>
-                                    <span style={{ fontSize: '1.25rem', marginRight: 8 }}>📋</span>
-                                    历史订单记录 <span style={{fontSize: '0.875rem', color: '#6b7280', fontWeight: 'normal'}}>({filteredOrders.length})</span>
-                                </div>
-                                <Input 
-                                    placeholder="搜索 Shipment ID / PO / 路线 / 车队..." 
-                                    prefix={<span style={{ color: '#9ca3af' }}>🔍</span>} 
-                                    value={searchText}
-                                    onChange={e => setSearchText(e.target.value)}
-                                    style={{ width: 350 }}
-                                    allowClear
-                                />
+                    <div style={{
+                        background: '#fff', borderRadius: 16, overflow: 'hidden',
+                        border: '1px solid #edf0f5', boxShadow: '0 6px 18px rgba(15,23,42,0.05)'
+                    }}>
+                        {/* 标题 + 主操作 */}
+                        <div style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            gap: 16, flexWrap: 'wrap', padding: '16px 20px', borderBottom: '1px solid #f1f4f8'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <span style={{
+                                    width: 32, height: 32, borderRadius: 10, background: '#eef4ff',
+                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 16
+                                }}>📋</span>
+                                <span style={{ fontSize: 17, fontWeight: 700, color: '#1f2937' }}>历史订单记录</span>
+                                <span style={{
+                                    padding: '2px 10px', borderRadius: 999, background: '#f3f5f9',
+                                    color: '#6b7280', fontSize: 13, fontWeight: 600
+                                }}>{filteredOrders.length} 条</span>
                             </div>
                             <Space>
-                                <DatePicker.RangePicker 
-                                    value={dateRange}
-                                    onChange={handleSelectByDateRange}
-                                    placeholder={['选择提货开始日期', '选择提货结束日期']}
-                                    style={{ width: 300 }}
-                                />
-                                <Button onClick={handleExport} icon={<span>📊</span>}>
-                                    导出Excel
-                                </Button>
-                                <Button danger onClick={handleBatchDelete} icon={<span>🗑️</span>}>
-                                    批量删除
-                                </Button>
-                                <Button onClick={refreshOrders}>🔄 刷新列表</Button>
+                                <Button className="toolbar-btn" onClick={handleExport} icon={<span>📊</span>}>导出Excel</Button>
+                                <Button className="toolbar-btn" danger onClick={handleBatchDelete} icon={<span>🗑️</span>} disabled={selectedRowKeys.length === 0}>批量删除</Button>
+                                <Button className="toolbar-btn" onClick={refreshOrders} icon={<span>🔄</span>}>刷新</Button>
                             </Space>
                         </div>
-                        <div style={{ marginBottom: 16 }}>
-                            <span style={{ marginLeft: 8 }}>
-                                {selectedRowKeys.length > 0 ? `已选择 ${selectedRowKeys.length} 项` : ''}
+
+                        {/* 筛选行 */}
+                        <div style={{
+                            display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+                            padding: '14px 20px', background: '#fbfcfe', borderBottom: '1px solid #f1f4f8'
+                        }}>
+                            <Input
+                                className="filter-bar"
+                                placeholder="搜索 Shipment ID / PO / 路线 / 车队..."
+                                prefix={<span style={{ color: '#9ca3af' }}>🔍</span>}
+                                value={searchText}
+                                onChange={e => setSearchText(e.target.value)}
+                                style={{ width: 330 }}
+                                allowClear
+                            />
+                            <antd.Segmented
+                                value={statusFilter}
+                                onChange={setStatusFilter}
+                                options={[
+                                    { label: '全部', value: 'all' },
+                                    { label: '⏰ 预定单', value: 'pre' },
+                                    { label: '📝 草稿', value: 'draft' }
+                                ]}
+                            />
+                            <DatePicker.RangePicker
+                                value={dateRange}
+                                onChange={handleSelectByDateRange}
+                                placeholder={['提货开始日期', '提货结束日期']}
+                                style={{ width: 285 }}
+                            />
+                            <span style={{
+                                marginLeft: 'auto', fontSize: 12.5, fontWeight: 600,
+                                color: selectedRowKeys.length > 0 ? '#1677ff' : '#9aa3af'
+                            }}>
+                                {selectedRowKeys.length > 0 ? '已选择 ' + selectedRowKeys.length + ' 项' : '未选择记录'}
                             </span>
                         </div>
-                        <Table 
-                            rowSelection={rowSelection}
-                            columns={columns} 
-                            dataSource={filteredOrders} 
-                            rowKey="id" 
-                            pagination={{ pageSize: 10 }} 
-                            scroll={{ x: 800 }}
-                            rowClassName={(record) => record.id === highlightedOrderId ? 'highlighted-row' : ''}
-                        />
-                    </Card>
+
+                        <div style={{ padding: '4px 20px 20px' }}>
+                            <Table
+                                rowSelection={rowSelection}
+                                columns={columns}
+                                dataSource={filteredOrders}
+                                rowKey="id"
+                                pagination={{ pageSize: 10, showSizeChanger: false }}
+                                scroll={{ x: 980 }}
+                                rowClassName={(record) => record.id === highlightedOrderId ? 'highlighted-row' : ''}
+                            />
+                        </div>
+                    </div>
                 </div>
             );
         };
 
         // 6. 总览/仪表盘组件 (新增)
-        const Overview = ({ onNavigate, onHighlightOrder }) => {
+        const Overview = ({ onNavigate, onHighlightOrder, onEditOrder }) => {
             const [orders, setOrders] = useState([]);
             const [pendingDispatch, setPendingDispatch] = useState([]);
             const [inTransit, setInTransit] = useState([]);
-            const [stats, setStats] = useState({ totalOrders: 0, currentMonthOrders: 0, topFleets: [] });
+            const [pendingPreOrders, setPendingPreOrders] = useState([]);
+            const [draftOrders, setDraftOrders] = useState([]);
 
             useEffect(() => {
                 const allOrders = getOrders();
                 setOrders(allOrders);
                 processOrders(allOrders);
-                calculateStats(allOrders);
             }, []);
-
-            const calculateStats = (data) => {
-                const currentMonth = dayjs().startOf('month');
-                let currentMonthCount = 0;
-                const fleetCounts = {};
-
-                data.forEach(order => {
-                    // 本月订单数
-                    if (order.createdAt && dayjs(order.createdAt).isAfter(currentMonth)) {
-                        currentMonthCount++;
-                    }
-                    
-                    // 车队使用次数统计
-                    if (order.fleet) {
-                        fleetCounts[order.fleet] = (fleetCounts[order.fleet] || 0) + 1;
-                    }
-                });
-
-                // 取前三名常用车队
-                const topFleets = Object.entries(fleetCounts)
-                    .sort(([, a], [, b]) => b - a)
-                    .slice(0, 3)
-                    .map(([name, count]) => ({ name, count }));
-
-                setStats({
-                    totalOrders: data.length,
-                    currentMonthOrders: currentMonthCount,
-                    topFleets
-                });
-            };
 
             const processOrders = (data) => {
                 const today = dayjs().startOf('day');
                 
                 const pending = [];
                 const transit = [];
+                const preOrders = [];
 
                 data.forEach(order => {
+                    if (order.isDraft) return; // 草稿不进入正式流程统计
+                    if (order.isPreOrder) {
+                        // 预定单处理逻辑
+                        if (order.reminderDate) {
+                            const reminder = dayjs(order.reminderDate).startOf('day');
+                            if (reminder.valueOf() <= today.valueOf()) {
+                                preOrders.push(order);
+                            }
+                        }
+                        return; // 预定单不进入待派车和运输中
+                    }
+
                     const pickupDate = order.pickupDate ? dayjs(order.pickupDate).startOf('day') : null;
-                    const deliveryDate = order.deliveryDate ? dayjs(order.deliveryDate).endOf('day') : null;
+                    const deliveryDate = order.deliveryDate ? dayjs(order.deliveryDate).startOf('day') : null;
 
                     if (!pickupDate) return;
 
@@ -2444,107 +2688,185 @@
                     }
 
                     // 2. 运输中判断
-                    // 逻辑：提货日期 <= 今天 <= 送货日期
-                    // 如果没有送货日期，假设提货当天即运输中
-                    if (today.isSame(pickupDate, 'day') || (deliveryDate && today.isAfter(pickupDate) && today.isBefore(deliveryDate.add(1, 'day')))) {
-                         transit.push(order);
+                    // 逻辑：提货日 <= 今天 <= 送货日；送货日次日起视为已完成，不再显示
+                    // 如果没有送货日期，仅提货当天算运输中
+                    if (deliveryDate) {
+                        if (today.valueOf() >= pickupDate.valueOf() && today.valueOf() <= deliveryDate.valueOf()) {
+                            transit.push(order);
+                        }
+                    } else if (today.isSame(pickupDate, 'day')) {
+                        transit.push(order);
                     }
                 });
 
                 // 按日期排序
                 pending.sort((a, b) => dayjs(a.pickupDate).valueOf() - dayjs(b.pickupDate).valueOf());
                 transit.sort((a, b) => dayjs(a.pickupDate).valueOf() - dayjs(b.pickupDate).valueOf());
+                preOrders.sort((a, b) => dayjs(a.reminderDate).valueOf() - dayjs(b.reminderDate).valueOf());
 
                 setPendingDispatch(pending);
                 setInTransit(transit);
+                setPendingPreOrders(preOrders);
+                setDraftOrders(data.filter(o => o.isDraft));
             };
 
-            const cardStyle = {
-                marginBottom: 24, 
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                borderRadius: 8
-            };
+            // ---- 总览：状态胶囊 + 分类表格（列头对齐、横向铺满） ----
+            const StatChip = ({ icon, label, value, color, onClick }) => (
+                <div
+                    onClick={onClick}
+                    className={onClick ? 'stat-chip clickable' : 'stat-chip'}
+                    style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 7,
+                        padding: '6px 13px', borderRadius: 999,
+                        background: color + '12', border: '1px solid ' + color + '26',
+                        cursor: onClick ? 'pointer' : 'default', userSelect: 'none'
+                    }}
+                >
+                    <span style={{ fontSize: 13.5 }}>{icon}</span>
+                    <span style={{ fontSize: 12.5, color: '#6b7280', fontWeight: 500 }}>{label}</span>
+                    <span style={{ fontSize: 14.5, fontWeight: 800, color: color }}>{value}</span>
+                </div>
+            );
 
-            const columns = [
-                { title: 'Shipment ID', dataIndex: 'shipmentId', key: 'shipmentId' },
-                { title: '路线', dataIndex: 'routeName', key: 'routeName' },
-                { 
-                    title: '提货日期', 
-                    dataIndex: 'pickupDate', 
-                    key: 'pickupDate',
-                    render: t => <span style={{color: '#d97706', fontWeight: 'bold'}}>{dayjs(t).format('YYYY-MM-DD')}</span>
-                },
-                { title: '承运车队', dataIndex: 'fleet', key: 'fleet' },
+            const fmtMD = (v) => (v ? dayjs(v).format('MM-DD') : '-');
+
+            const cellId = (o) => (
+                <span title={o.shipmentId || o.poNumber || '未填单号'} style={{ fontWeight: 700, color: '#1f2937' }}>
+                    {o.shipmentId || o.poNumber || '未填单号'}
+                </span>
+            );
+            const cellRoute = (o) => (
+                <span title={o.routeName || ''} style={{ color: '#4b5563' }}>{o.routeName || '-'}</span>
+            );
+            const cellDate = (v, color) => (
+                <span style={{ color: v ? (color || '#374151') : '#c3c9d4', fontWeight: v ? 600 : 400 }}>{fmtMD(v)}</span>
+            );
+            const cellFleet = (o) => <span style={{ color: '#4b5563' }}>{o.fleet || '-'}</span>;
+            const cellOp = (label, color, onClick) => (
+                <Button size="small" type="link" style={{ padding: 0, height: 'auto', fontWeight: 600, color: color }} onClick={onClick}>{label}</Button>
+            );
+
+            // 列定义：宽度用 fr 自适应铺满整行；日期用 MM-DD 保证窄列也读得全
+            const C_ID = { label: 'Shipment ID', width: 'minmax(0, 1.05fr)', cell: cellId };
+            const C_ROUTE = { label: '路线', width: 'minmax(0, 1.7fr)', cell: cellRoute };
+            const C_PICK = { label: '提货日期', width: 'minmax(0, 1fr)', cell: (o) => cellDate(o.pickupDate, '#b45309') };
+            const C_DELIV = { label: '送货日期', width: 'minmax(0, 1fr)', cell: (o) => cellDate(o.deliveryDate, '#15803d') };
+            const C_FLEET = { label: '承运车队', width: 'minmax(0, 1fr)', cell: cellFleet };
+            const COL_OP = (color, label, onClick) => ({ label: '操作', width: '82px', cell: (o) => cellOp(label, color, typeof onClick === 'function' ? () => onClick(o) : null) });
+
+            const Section = ({ icon, title, count, color, columns, items }) => (
+                <div style={{ marginBottom: 16 }}>
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9,
+                        paddingLeft: 9, borderLeft: '3px solid ' + color
+                    }}>
+                        <span style={{ fontSize: 15 }}>{icon}</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: '#374151' }}>{title}</span>
+                        <span style={{
+                            padding: '0px 9px', borderRadius: 999, background: color + '14',
+                            color: color, fontSize: 12.5, fontWeight: 700
+                        }}>{count}</span>
+                    </div>
+                    <div style={{ border: '1px solid #edf0f5', borderRadius: 12, overflow: 'hidden' }}>
+                        <div style={{
+                            display: 'grid', gridTemplateColumns: columns.map(c => c.width).join(' '),
+                            background: '#fafbfd', borderBottom: '1px solid #edf0f5'
+                        }}>
+                            {columns.map((c, i) => (
+                                <div key={i} style={{
+                                    padding: '8px 8px', fontSize: 12, fontWeight: 600, color: '#8a93a2',
+                                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                                }}>{c.label}</div>
+                            ))}
+                        </div>
+                        {items.map((o, idx) => (
+                            <div key={o.id} className="tbl-row" style={{
+                                display: 'grid', gridTemplateColumns: columns.map(c => c.width).join(' '),
+                                alignItems: 'center', background: '#fff',
+                                borderTop: idx === 0 ? 'none' : '1px solid #f3f6fa'
+                            }}>
+                                {columns.map((c, i) => (
+                                    <div key={i} style={{
+                                        padding: '9px 8px', minWidth: 0, fontSize: 13,
+                                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                                    }}>{c.cell(o)}</div>
+                                ))}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            const sections = [
                 {
-                    title: '操作',
-                    key: 'action',
-                    render: (_, record) => (
-                        <Button type="link" size="small" onClick={() => {
-                            onNavigate('5');
-                            if (onHighlightOrder) onHighlightOrder(record.id);
-                        }}>查看详情</Button>
-                    )
+                    key: 'pre', icon: '⏰', title: '预定单派车', count: pendingPreOrders.length,
+                    color: '#d4380d', items: pendingPreOrders,
+                    columns: [C_ID, C_ROUTE,
+                        { label: '提醒日期', width: 'minmax(0, 1fr)', cell: (o) => cellDate(o.reminderDate, '#d4380d') },
+                        C_PICK, C_FLEET,
+                        COL_OP('#d4380d', '去派车', (o) => { onHighlightOrder(o.id); onNavigate('5'); })
+                    ]
+                },
+                {
+                    key: 'pending', icon: '📢', title: '准备派车', count: pendingDispatch.length,
+                    color: '#b45309', items: pendingDispatch,
+                    columns: [C_ID, C_ROUTE, C_PICK, C_FLEET,
+                        COL_OP('#b45309', '查看详情', (o) => { onNavigate('5'); if (onHighlightOrder) onHighlightOrder(o.id); })
+                    ]
+                },
+                {
+                    key: 'transit', icon: '🚚', title: '运输中', count: inTransit.length,
+                    color: '#15803d', items: inTransit,
+                    columns: [C_ID, C_ROUTE, C_PICK, C_DELIV, C_FLEET,
+                        COL_OP('#15803d', '查看详情', (o) => { onNavigate('5'); if (onHighlightOrder) onHighlightOrder(o.id); })
+                    ]
+                },
+                {
+                    key: 'draft', icon: '📝', title: '草稿待完善', count: draftOrders.length,
+                    color: '#0891b2', items: draftOrders,
+                    columns: [C_ID, C_ROUTE,
+                        { label: '最后编辑', width: 'minmax(0, 1.2fr)', cell: (o) => <span style={{ color: '#0891b2', fontWeight: 600 }}>{o.updatedAt ? dayjs(o.updatedAt).format('MM-DD HH:mm') : '-'}</span> },
+                        C_FLEET,
+                        COL_OP('#0891b2', '继续完善', (o) => { if (onEditOrder) onEditOrder(o); })
+                    ]
                 }
             ];
+            const activeSections = sections.filter(s => s.items.length > 0);
 
             return (
                 <div style={{ padding: '0 8px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-                        {/* 待派车/准备派车 */}
-                        <Card 
-                            title={
-                                <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
-                                    <span style={{fontSize: 20}}>📢</span>
-                                    <span style={{fontSize: 18, fontWeight: 'bold', color: '#b45309'}}>准备派车 ({pendingDispatch.length})</span>
-                                </div>
-                            } 
-                            bordered={false} 
-                            style={{...cardStyle, borderTop: '4px solid #f59e0b'}}
-                            headStyle={{backgroundColor: '#fffbeb'}}
-                        >
-                            {pendingDispatch.length > 0 ? (
-                                <Table 
-                                    dataSource={pendingDispatch} 
-                                    columns={columns} 
-                                    rowKey="id" 
-                                    pagination={false} 
-                                    size="small"
-                                />
-                            ) : (
-                                <Empty description="暂无急需派车的订单" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                            )}
-                            <div style={{marginTop: 16, fontSize: 12, color: '#9ca3af'}}>
-                                * 智能提醒：根据提货日期提前1个工作日提醒（自动跳过周末）
+                    <div style={{
+                        background: '#fff', borderRadius: 16, border: '1px solid #eef1f5',
+                        boxShadow: '0 4px 16px rgba(15,23,42,0.05)', overflow: 'hidden'
+                    }}>
+                        {/* 顶部一行状态胶囊：指标一览 + 点击直达 */}
+                        <div style={{
+                            display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+                            padding: '14px 18px', borderBottom: '1px solid #f2f4f8'
+                        }}>
+                            <span style={{ fontSize: 16, fontWeight: 800, color: '#1f2937', marginRight: 4 }}>总览</span>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginLeft: 'auto' }}>
+                                <StatChip icon="⏰" label="预定单派车" value={pendingPreOrders.length} color="#d4380d" onClick={() => onNavigate('5')} />
+                                <StatChip icon="📢" label="准备派车" value={pendingDispatch.length} color="#b45309" onClick={() => onNavigate('5')} />
+                                <StatChip icon="🚚" label="运输中" value={inTransit.length} color="#15803d" onClick={() => onNavigate('5')} />
+                                <StatChip icon="📝" label="草稿" value={draftOrders.length} color="#0891b2" onClick={() => onNavigate('5')} />
                             </div>
-                        </Card>
+                        </div>
 
-                        {/* 运输中 */}
-                        <Card 
-                            title={
-                                <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
-                                    <span style={{fontSize: 20}}>🚚</span>
-                                    <span style={{fontSize: 18, fontWeight: 'bold', color: '#15803d'}}>运输中 ({inTransit.length})</span>
+                        {/* 分类表格：宽屏左右并排，窄屏自动上下排；表格列自适应铺满整行 */}
+                        <div style={{
+                            padding: '2px 18px 16px',
+                            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(520px, 1fr))',
+                            gap: '0 24px', alignItems: 'start'
+                        }}>
+                            {activeSections.length === 0 ? (
+                                <div style={{ gridColumn: '1 / -1', padding: '34px 0', textAlign: 'center', color: '#9aa3af', fontSize: 13.5 }}>
+                                    ✓ 暂无需要处理的派车单
                                 </div>
-                            } 
-                            bordered={false} 
-                            style={{...cardStyle, borderTop: '4px solid #22c55e'}}
-                            headStyle={{backgroundColor: '#f0fdf4'}}
-                        >
-                             {inTransit.length > 0 ? (
-                                <Table 
-                                    dataSource={inTransit} 
-                                    columns={columns} 
-                                    rowKey="id" 
-                                    pagination={false} 
-                                    size="small"
-                                />
-                            ) : (
-                                <Empty description="暂无运输中的订单" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                            )}
-                             <div style={{marginTop: 16, fontSize: 12, color: '#9ca3af'}}>
-                                * 状态说明：当前日期在提货日期和送货日期之间
-                            </div>
-                        </Card>
+                            ) : activeSections.map(s => (
+                                <Section key={s.key} icon={s.icon} title={s.title} count={s.count} color={s.color} columns={s.columns} items={s.items} />
+                            ))}
+                        </div>
                     </div>
                 </div>
             );
@@ -2689,6 +3011,34 @@
                 // 移除 loading
                 const loading = document.getElementById('loading-text');
                 if (loading) loading.style.display = 'none';
+
+                // 预定单提醒检查
+                const allOrders = getOrders();
+                const today = dayjs().startOf('day').valueOf();
+                const alerts = allOrders.filter(o => o.isPreOrder && o.reminderDate && dayjs(o.reminderDate).startOf('day').valueOf() <= today);
+                
+                if (alerts.length > 0) {
+                    Modal.warning({
+                        title: '⚠️ 预定单派车提醒',
+                        content: (
+                            <div style={{ marginTop: 16 }}>
+                                <p style={{ color: '#d4380d', fontWeight: 'bold' }}>您有 {alerts.length} 个预定单已到达或超过派车提醒日期！</p>
+                                <ul style={{ paddingLeft: 20, maxHeight: 150, overflowY: 'auto' }}>
+                                    {alerts.map(a => (
+                                        <li key={a.id} style={{ marginBottom: 4 }}>
+                                            {a.shipmentId || a.poNumber || '未知单号'} 
+                                            (提醒日: {dayjs(a.reminderDate).format('MM-DD')})
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ),
+                        okText: '去处理',
+                        onOk: () => {
+                            setActiveTab('5');
+                        }
+                    });
+                }
             }, []);
 
             const handleEditOrder = (order) => {
@@ -2756,6 +3106,7 @@
                     label: <span style={{fontSize: 16}}>📊 总览</span>,
                     children: <Overview 
                         onNavigate={setActiveTab} 
+                        onEditOrder={handleEditOrder}
                         onHighlightOrder={(id) => {
                             setHighlightedOrderId(id);
                             setTimeout(() => setHighlightedOrderId(null), 3000);
@@ -2823,41 +3174,46 @@
                     theme={{
                         token: {
                             colorPrimary: '#1677ff',
-                            borderRadius: 8,
+                            borderRadius: 10,
                             colorBgContainer: '#ffffff',
                         },
                     }}
                 >
-                    <div className="container">
-                        <div style={{ position: 'relative', marginBottom: 40, textAlign: 'center' }}>
-                            <Title level={2} style={{ margin: 0, color: '#1f2937', display: 'inline-block' }}>
-                                <span style={{fontWeight: 800, fontSize: '34px'}}>
-                                    🚛 派车表管理系统
-                                </span>
-                            </Title>
-                            <div style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}>
-                                <Space>
-                                    <Button onClick={handleBackup}>📤 备份数据</Button>
-                                    <Button onClick={() => document.getElementById('import-input').click()}>📥 恢复数据</Button>
-                                </Space>
+                    <div className="app-shell">
+                        <aside className="app-side">
+                            <div className="app-brand">
+                                <span className="app-brand-mark">🚛</span>
+                                <div>
+                                    <div className="app-brand-title">派车表</div>
+                                    <div className="app-brand-sub">DISPATCH</div>
+                                </div>
                             </div>
-                            <input 
-                                type="file" 
-                                id="import-input" 
-                                style={{display: 'none'}} 
-                                accept=".json" 
-                                onChange={handleImport} 
-                            />
-                        </div>
-                        <Tabs 
-                            defaultActiveKey="0" 
-                            activeKey={activeTab} 
-                            onChange={setActiveTab} 
-                            items={items} 
-                            type="card"
-                            size="large"
-                            tabBarStyle={{marginBottom: 32}}
-                        />
+                            <nav className="app-nav">
+                                {items.map(it => (
+                                    <div
+                                        key={it.key}
+                                        className={'app-nav-item' + (activeTab === it.key ? ' active' : '')}
+                                        onClick={() => setActiveTab(it.key)}
+                                    >
+                                        {it.label}
+                                    </div>
+                                ))}
+                            </nav>
+                            <div className="app-side-foot">
+                                <Button block className="side-btn" onClick={handleBackup}>📤 备份数据</Button>
+                                <Button block className="side-btn" onClick={() => document.getElementById('import-input').click()}>📥 恢复数据</Button>
+                                <input 
+                                    type="file" 
+                                    id="import-input" 
+                                    style={{display: 'none'}} 
+                                    accept=".json" 
+                                    onChange={handleImport} 
+                                />
+                            </div>
+                        </aside>
+                        <main className="app-main">
+                            {(items.find(i => i.key === activeTab) || {}).children}
+                        </main>
                     </div>
                 </ConfigProvider>
             );
