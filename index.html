@@ -498,11 +498,28 @@
             const [isPreOrder, setIsPreOrder] = useState(false);
             // true 表示提醒日期仍由提货日期自动推算；用户手动改过后置 false
             const reminderAutoRef = React.useRef(true);
+            // 线路名称是否自动生成（用户手动改过或选了模板后置 false）
+            const routeNameAutoRef = React.useRef(true);
 
             // 加载车队历史记录
             useEffect(() => {
                 setFleets(getFleets());
             }, []);
+
+            // 线路名称自动生成：按站点简称拼接「简称-简称-简称」
+            const buildStopsRouteName = (stopsList) => (stopsList || [])
+                .map(s => {
+                    const a = addresses.find(x => x.id === s.addressId);
+                    if (!a) return '';
+                    return (a.shortName || a.name || '').trim();
+                })
+                .filter(Boolean)
+                .join('-');
+
+            useEffect(() => {
+                if (!routeNameAutoRef.current) return;
+                form.setFieldsValue({ routeName: buildStopsRouteName(currentStops) });
+            }, [currentStops, addresses]);
 
             // 监听编辑状态
             useEffect(() => {
@@ -515,11 +532,13 @@
             const fillFormFromOrder = (order) => {
                 // 编辑已有预定单时保留其提醒日期；没有则继续保持自动推算
                 reminderAutoRef.current = !order.reminderDate;
+                routeNameAutoRef.current = !order.routeName;
                 // 填充表单
                 form.setFieldsValue({
                     isPreOrder: !!order.isPreOrder,
                     reminderDate: order.reminderDate ? dayjs(order.reminderDate) : null,
                     routeSelect: order.routeSelect, // 尝试保留选择状态
+                    routeName: order.routeName || '',
                     shipmentId: order.shipmentId,
                     poNumber: order.poNumber,
                     fleet: order.fleet,
@@ -573,6 +592,9 @@
                 const route = routes.find(r => r.id === routeId);
                 if (route) {
                     setSelectedRoute(route);
+                    // 选了线路模板：用模板名，停止按站点自动生成
+                    routeNameAutoRef.current = false;
+                    form.setFieldsValue({ routeName: route.name || '' });
                     setCurrentStops(route.stops.map((s, i) => ({ 
                         key: Date.now() + i, 
                         addressId: s.addressId,
@@ -718,6 +740,7 @@
             const handleReset = () => {
                 form.resetFields();
                 setSelectedRoute(null);
+                routeNameAutoRef.current = true;
                 setCurrentStops([]);
                 setPrintData(null);
                 setIsPreOrder(false);
@@ -773,7 +796,7 @@
 
             const handleGenerate = () => {
                 form.validateFields().then(values => {
-                    const routeName = selectedRoute?.name || '';
+                    const routeName = (values.routeName || '').trim() || selectedRoute?.name || buildStopsRouteName(currentStops) || '';
                     
                     // --- 保存新车队 ---
                     const newFleet = values.fleet;
@@ -850,9 +873,10 @@
             const handleSaveDraft = () => {
                 const values = form.getFieldsValue(true);
                 const routeId = values.routeSelect;
-                const routeName = routeId
-                    ? (routes.find(r => r.id === routeId)?.name || selectedRoute?.name || '')
-                    : (selectedRoute?.name || '');
+                const routeName = (values.routeName || '').trim()
+                    || (routeId ? (routes.find(r => r.id === routeId)?.name || selectedRoute?.name || '') : (selectedRoute?.name || ''))
+                    || buildStopsRouteName(currentStops)
+                    || '';
 
                 // 保存新输入的承运车队 (与正式单保持一致)
                 const newFleet = values.fleet;
@@ -962,9 +986,9 @@
                     <Card bordered={false} style={{ marginBottom: 24, boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
                         <div className="sec-h"><span className="si">{React.createElement(icons.ProfileOutlined)}</span>线路与单据信息</div>
                         
-                        <Form form={form} layout="vertical">
+                        <Form form={form} layout="vertical" onValuesChange={(changed) => { if (Object.prototype.hasOwnProperty.call(changed, 'routeName')) routeNameAutoRef.current = false; }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16, alignItems: 'start' }}>
-                                <Form.Item name="routeSelect" label="选择线路" required style={{ marginBottom: 0 }}>
+                                <Form.Item name="routeSelect" label="选择线路（可选）" style={{ marginBottom: 0 }} extra="不选也可以：填好下面的站点，线路名称会自动生成">
                                     <Select 
                                         showSearch
                                         placeholder="请选择一条线路..."
@@ -980,6 +1004,9 @@
                                             </Select.Option>
                                         ))}
                                     </Select>
+                                </Form.Item>
+                                <Form.Item name="routeName" label="线路名称" style={{ marginBottom: 0 }} extra="选完站点自动按「简称-简称-简称」生成，也可手动修改">
+                                    <Input size="large" variant="filled" placeholder="例如：正盛-厦门物流园-协丰" />
                                 </Form.Item>
                                 <Form.Item
                                     name="isPreOrder"
@@ -1301,6 +1328,7 @@
 
             const columns = [
                 { title: '名称', dataIndex: 'name', key: 'name', render: t => <Text strong>{t}</Text> },
+                { title: '简称', dataIndex: 'shortName', key: 'shortName', width: 110, render: t => t ? <Text strong>{t}</Text> : <Text type="secondary">-</Text> },
                 { title: '地址', dataIndex: 'location', key: 'location' },
                 { title: '联系人', dataIndex: 'contactPerson', key: 'contactPerson' },
                 { title: '联系方式', dataIndex: 'contactInfo', key: 'contactInfo' },
@@ -1325,7 +1353,8 @@
                 !searchText || 
                 addr.name.includes(searchText) || 
                 (addr.location && addr.location.includes(searchText)) ||
-                (addr.contactPerson && addr.contactPerson.includes(searchText))
+                (addr.contactPerson && addr.contactPerson.includes(searchText)) ||
+                (addr.shortName && addr.shortName.includes(searchText))
             );
 
             const handleEdit = (record) => {
@@ -1446,7 +1475,7 @@
                             rowKey="id"
                             pagination={{ pageSize: 8 }}
                             locale={{ emptyText: <Empty description="暂无地址数据" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
-                            scroll={{ x: 800 }}
+                            scroll={{ x: 920 }}
                         />
                     </Card>
 
@@ -1503,6 +1532,9 @@
                             <Form.Item name="name" label="工厂/物流园名称" rules={[{ required: true, message: '请输入名称' }]}>
                                 <Input size="large" variant="filled" placeholder="例如：捷通物流园" />
                             </Form.Item>
+                            <Form.Item name="shortName" label="简称" extra="用于自动生成线路名称：选完站点后线路名会按「简称-简称-简称」自动生成，不填则用全名">
+                                <Input size="large" variant="filled" placeholder="例如：赛隆" />
+                            </Form.Item>
                             <Form.Item name="location" label="详细地址" rules={[{ required: true, message: '请输入地址' }]}>
                                 <Input size="large" variant="filled" placeholder="例如：深圳市龙岗区xx路xx号" />
                             </Form.Item>
@@ -1532,6 +1564,8 @@
             const [stops, setStops] = useState([]);
             const [draggedIndex, setDraggedIndex] = useState(null);
             const [fleets, setFleets] = useState([]);
+            // 路线模板名称是否自动生成（用户手动改过后置 false）
+            const routeNameAutoRef = React.useRef(true);
             
             useEffect(() => {
                 setFleets(getFleets());
@@ -1562,13 +1596,30 @@
                         type: s.type || (i === 0 ? 'pickup' : (i === editingRoute.stops.length - 1 ? 'delivery' : 'logistics'))
                     })));
                     setCargoInfo(editingRoute.cargo || { description: '', count: 0, cbm: 0, weight: 0, note: '' });
+                    routeNameAutoRef.current = !editingRoute.name;
                 }
             }, [editingRoute, form]);
+
+            // 路线模板名称自动生成：按站点简称拼接「简称-简称-简称」
+            const buildStopsName = (stopsList) => (stopsList || [])
+                .map(s => {
+                    const a = addresses.find(x => x.id === s.addressId);
+                    if (!a) return '';
+                    return (a.shortName || a.name || '').trim();
+                })
+                .filter(Boolean)
+                .join('-');
+
+            useEffect(() => {
+                if (!routeNameAutoRef.current) return;
+                form.setFieldsValue({ routeName: buildStopsName(stops) });
+            }, [stops, addresses]);
 
             const handleCancelEdit = () => {
                 setEditingRoute(null);
                 form.resetFields();
                 setStops([]);
+                routeNameAutoRef.current = true;
                 setCargoInfo({ description: '', count: 0, cbm: 0, weight: 0, note: '' });
                 message.info('已取消编辑，重置为新建模式');
             };
@@ -1692,6 +1743,7 @@
                     setStops([]);
                     setCargoInfo({ description: '', count: 0, cbm: 0, weight: 0, note: '' });
                     setEditingRoute(null);
+                    routeNameAutoRef.current = true;
                     setActiveTab('3'); // 跳转到管理页
                 });
             };
@@ -1716,7 +1768,7 @@
                                 </Button>
                             )}
                         </div>
-                        <Form form={form} layout="vertical">
+                        <Form form={form} layout="vertical" onValuesChange={(changed) => { if (Object.prototype.hasOwnProperty.call(changed, 'routeName')) routeNameAutoRef.current = false; }}>
                             <Form.Item name="routeName" label={<span style={{ fontWeight: 'bold', color: '#374151' }}>路线模板名称</span>} rules={[{ required: true, message: '请输入路线名称' }]}>
                                 <Input size="large" placeholder="例如：2023-10-27 深圳-东莞-惠州 拼车" variant="filled" style={{fontSize: 16}} />
                             </Form.Item>
@@ -2448,6 +2500,17 @@
                 }
             };
 
+            // 一键选中全部未导出的订单（在当前筛选结果内）
+            const handleSelectUnexported = () => {
+                const keys = filteredOrders.filter(o => !o.isExported).map(o => o.id);
+                if (keys.length === 0) {
+                    message.info('当前列表里没有未导出的订单');
+                    return;
+                }
+                setSelectedRowKeys(keys);
+                message.success('已选中 ' + keys.length + ' 条未导出订单');
+            };
+
             const toggleExportStatus = (record) => {
                 const newOrders = orders.map(o => {
                     if (o.id === record.id) {
@@ -2631,6 +2694,7 @@
                                 }}>{filteredOrders.length} 条记录</span>
                             </div>
                             <Space>
+                                <Button className="toolbar-btn" onClick={handleSelectUnexported} icon={React.createElement(icons.CheckSquareOutlined)}>选中未导出</Button>
                                 <Button className="toolbar-btn" onClick={handleExport} icon={React.createElement(icons.FileExcelOutlined)}>导出Excel</Button>
                                 <Button className="toolbar-btn" danger onClick={handleBatchDelete} icon={React.createElement(icons.DeleteOutlined)} disabled={selectedRowKeys.length === 0}>批量删除</Button>
                                 <Button className="toolbar-btn" onClick={refreshOrders} icon={React.createElement(icons.ReloadOutlined)}>刷新</Button>
