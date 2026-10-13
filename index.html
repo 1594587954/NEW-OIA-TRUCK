@@ -33,136 +33,172 @@
     <script src="https://cdn.staticfile.org/xlsx/0.18.5/xlsx.full.min.js"></script>
     
     <style>
+        :root {
+            --pri:#4f46e5; --pri-700:#4338ca; --pri-50:#eef2ff; --pri-100:#e0e7ff;
+            --ink:#0f172a; --ink-2:#475569; --ink-3:#64748b; --muted:#94a3b8;
+            --line:#e9ebf2; --line-2:#f1f3f8; --bg:#f5f6fb;
+            --shadow:0 1px 2px rgba(16,24,40,.04), 0 12px 28px -18px rgba(16,24,40,.18);
+            --r-card:18px; --r-ctl:10px;
+        }
         html { overflow-x: hidden; }
-        body { 
-            padding: 18px; 
-            background: linear-gradient(160deg, #f7f9fc 0%, #eef2f8 45%, #eaf0f7 100%);
-            font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', Roboto, 'Microsoft YaHei', sans-serif; 
-            min-height: 100vh;
-            color: #1f2937;
+        body {
+            padding: 18px;
+            background:
+                radial-gradient(1100px 520px at 100% -8%, #eef2ff 0%, rgba(238,242,255,0) 55%),
+                radial-gradient(900px 460px at -8% 2%, #f3eeff 0%, rgba(243,238,255,0) 50%),
+                var(--bg);
+            font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', Roboto, 'Microsoft YaHei', sans-serif;
+            min-height: 100vh; color: var(--ink);
+            -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
             overflow-x: hidden;
         }
-        .container { 
-            max-width: 1200px; 
-            margin: 0 auto; 
-            background: rgba(255, 255, 255, 0.95); /* 轻微透明 */
-            backdrop-filter: blur(10px);
-            padding: 32px; 
-            border-radius: 16px; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.08); 
-            min-height: 500px; 
-            border: 1px solid rgba(255,255,255,0.5);
-        }
-        #error-display { display: none; color: red; padding: 20px; background: #fff0f0; border: 1px solid red; margin: 20px; border-radius: 8px; }
-        .loading-container { text-align: center; padding: 50px; }
-        .loading-spinner { font-size: 24px; color: #1890ff; margin-bottom: 10px; }
-        
-        /* 增加一些全局样式优化 */
-        .ant-btn-primary { box-shadow: 0 4px 10px rgba(24, 144, 255, 0.3); }
-        .ant-card { border-radius: 12px !important; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
-        .section-title { color: #1f2937; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-        
+        .container { max-width:1200px; margin:0 auto; background:#fff; padding:32px; border-radius:16px; min-height:500px; border:1px solid var(--line); }
+        #error-display { display:none; color:red; padding:20px; background:#fff0f0; border:1px solid red; margin:20px; border-radius:8px; }
+        .loading-container { text-align:center; padding:50px; }
+        .loading-spinner { font-size:24px; color:var(--pri); margin-bottom:10px; }
+
         /* 打印专用样式 */
         @media print {
-            @page {
-                size: A4 portrait;
-                margin: 10mm;
-            }
-            html, body {
-                height: auto !important;
-                overflow: visible !important;
-                background: white !important;
-                padding: 0 !important;
-                margin: 0 !important;
-            }
-            /* 隐藏除 print-root 外的所有元素 */
-            body > *:not(#print-root) {
-                display: none !important;
-            }
-            #print-root {
-                display: block !important;
-                position: relative;
-                width: 100%;
-                background: white;
-            }
-            /* 强制打印背景色 */
-            * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
+            @page { size: A4 portrait; margin: 10mm; }
+            html, body { height:auto !important; overflow:visible !important; background:white !important; padding:0 !important; margin:0 !important; }
+            body > *:not(#print-root) { display:none !important; }
+            #print-root { display:block !important; position:relative; width:100%; background:white; }
+            * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
         }
         #print-root { display: none; }
-        
+
         /* 订单高亮效果 */
-        .highlighted-row {
-            animation: highlight-fade 3s ease-out forwards;
-        }
-        @keyframes highlight-fade {
-            0% { background-color: #fffbe6; }
-            50% { background-color: #fffbe6; }
-            100% { background-color: transparent; }
-        }
+        .highlighted-row { animation: highlight-fade 3s ease-out forwards; }
+        @keyframes highlight-fade { 0%{background-color:#eef2ff;} 50%{background-color:#eef2ff;} 100%{background-color:transparent;} }
 
-        /* 总览页状态胶囊 / 订单行 的交互反馈 */
-        .stat-chip { transition: box-shadow .18s ease, transform .18s ease, background .18s ease; }
-        .stat-chip.clickable:hover { box-shadow: 0 6px 16px rgba(15,23,42,0.12); transform: translateY(-1px); background: #fff; }
-        .order-row { transition: box-shadow .18s ease, transform .18s ease, border-color .18s ease, background .18s ease; }
-        .order-row:hover { background: #fff; border-color: #e2e8f0; box-shadow: 0 6px 16px rgba(15,23,42,0.07); transform: translateY(-1px); }
-        .tbl-row { transition: background .16s ease; }
-        .tbl-row:hover { background: #f7fafe !important; }
-        .filter-bar { border-radius: 10px !important; }
-        .filter-bar:focus-within { border-color: #bfdbfe !important; box-shadow: 0 0 0 3px rgba(22,119,255,0.08); }
-        .toolbar-btn { border-radius: 10px !important; }
-
-        /* ===== 焕然一新：左侧导航 + 主区卡片（配色仍为蓝色主题） ===== */
-        .app-shell { max-width: 1320px; margin: 0 auto; display: flex; gap: 18px; align-items: flex-start; }
+        /* ===== 布局外壳 ===== */
+        .app-shell { max-width:1360px; margin:0 auto; display:flex; gap:22px; align-items:flex-start; }
         .app-side {
-            width: 196px; flex: 0 0 196px; background: #fff; border-radius: 18px;
-            border: 1px solid #eef1f5; box-shadow: 0 4px 18px rgba(31,41,55,0.05);
-            padding: 14px 12px; position: sticky; top: 18px;
+            width:216px; flex:0 0 216px; padding:16px 14px;
+            background:#fff; border:1px solid var(--line); border-radius:var(--r-card);
+            position:sticky; top:18px; box-shadow:var(--shadow);
         }
-        .app-brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 13px; border-bottom: 1px solid #f2f4f8; margin-bottom: 10px; }
+        .app-brand { display:flex; align-items:center; gap:11px; padding:4px 6px 16px; border-bottom:1px solid var(--line-2); margin-bottom:12px; }
         .app-brand-mark {
-            width: 34px; height: 34px; border-radius: 11px; flex: 0 0 34px;
-            background: linear-gradient(135deg, #1677ff 0%, #52a0ff 100%);
-            display: inline-flex; align-items: center; justify-content: center; font-size: 17px;
-            box-shadow: 0 4px 10px rgba(22,119,255,0.25);
+            width:34px; height:34px; border-radius:10px; flex:0 0 34px;
+            background:linear-gradient(135deg,#6366f1,#4f46e5); color:#fff; font-size:17px;
+            display:inline-flex; align-items:center; justify-content:center;
+            box-shadow:0 6px 14px -6px rgba(79,70,229,.65);
         }
-        .app-brand-title { font-size: 15px; font-weight: 800; color: #1f2937; line-height: 1.25; }
-        .app-brand-sub { font-size: 11px; color: #9aa3af; letter-spacing: 2px; }
-        .app-nav { display: flex; flex-direction: column; gap: 3px; }
+        .app-brand-title { font-size:15px; font-weight:800; color:var(--ink); line-height:1.2; letter-spacing:-.2px; }
+        .app-brand-sub { font-size:10px; color:var(--muted); letter-spacing:1.8px; font-weight:600; }
+        .app-nav { display:flex; flex-direction:column; gap:3px; }
         .app-nav-item {
-            position: relative; display: flex; align-items: center; padding: 9px 12px;
-            border-radius: 11px; cursor: pointer; color: #5b6472; font-size: 14px; font-weight: 600;
-            transition: background .16s ease, color .16s ease; user-select: none;
+            position:relative; display:flex; align-items:center; padding:9px 11px; border-radius:10px;
+            cursor:pointer; color:var(--ink-3); font-size:13.5px; font-weight:500;
+            transition:background .15s ease, color .15s ease; user-select:none;
         }
-        .app-nav-item:hover { background: #f4f7fb; color: #1677ff; }
-        .app-nav-item.active { background: #eaf2ff; color: #1677ff; font-weight: 700; }
-        .app-nav-item.active::before {
-            content: ''; position: absolute; left: 0; top: 10px; bottom: 10px;
-            width: 3px; border-radius: 0 3px 3px 0; background: #1677ff;
-        }
-        .app-side-foot { margin-top: 13px; padding-top: 12px; border-top: 1px solid #f2f4f8; display: flex; flex-direction: column; gap: 8px; }
-        .side-btn { border-radius: 11px !important; font-size: 13px !important; font-weight: 600 !important; }
-        .app-main { flex: 1; min-width: 0; }
-        .app-page-head { display: flex; align-items: baseline; gap: 10px; padding: 0 4px 14px; }
-        .app-page-title { font-size: 20px; font-weight: 800; color: #1f2937; letter-spacing: .5px; }
+        .app-nav-item:hover { background:#f5f6fb; color:var(--ink); }
+        .app-nav-item.active { background:var(--pri-50); color:var(--pri); font-weight:600; }
+        .app-nav-item.active::before { content:""; position:absolute; left:0; top:50%; transform:translateY(-50%); width:3px; height:16px; border-radius:0 3px 3px 0; background:var(--pri); }
+        .app-nav-label { display:inline-flex; align-items:center; gap:10px; }
+        .app-nav-ico { font-size:15px; }
+        .app-side-foot { margin-top:14px; padding-top:12px; border-top:1px solid var(--line-2); display:flex; flex-direction:column; gap:8px; }
+        .side-btn.ant-btn { border-radius:10px !important; font-size:13px !important; font-weight:600 !important; height:36px; border-color:var(--line) !important; color:var(--ink-3) !important; }
+        .side-btn.ant-btn:hover { color:var(--pri) !important; border-color:var(--pri-100) !important; background:var(--pri-50) !important; }
+        .app-main { flex:1; min-width:0; }
 
-        /* 控件圆角统一（蓝色主题不变） */
-        .ant-btn { border-radius: 10px !important; font-weight: 600; }
-        .ant-btn-primary { box-shadow: 0 4px 12px rgba(22,119,255,0.22) !important; }
-        .ant-card { border-radius: 16px !important; box-shadow: 0 2px 12px rgba(31,41,55,0.05) !important; border-color: #eef1f5 !important; }
-        .ant-table-thead > tr > th { background: #fafbfd !important; color: #8a93a2 !important; font-weight: 600 !important; font-size: 13px !important; }
-        .ant-table-tbody > tr:hover > td { background: #f7fafe !important; }
-        .ant-input, .ant-input-number, .ant-picker, .ant-select-selector, .ant-input-affix-wrapper { border-radius: 10px !important; }
-        .ant-modal-content { border-radius: 18px !important; }
-        .ant-tag { border-radius: 999px !important; font-weight: 600; }
-        .ant-pagination-item { border-radius: 10px !important; }
-        .ant-segmented { border-radius: 12px !important; }
-        @media (max-width: 900px) {
-            .app-shell { flex-direction: column; }
-            .app-side { width: 100%; flex: none; position: static; }
-            .app-nav { flex-direction: row; flex-wrap: wrap; }
+        /* ===== 页面头 ===== */
+        .page-head { display:flex; align-items:flex-end; justify-content:space-between; gap:18px; flex-wrap:wrap; margin:2px 2px 20px; }
+        .page-head-l { min-width:0; }
+        .page-title { display:flex; align-items:center; gap:12px; font-size:27px; font-weight:800; color:var(--ink); letter-spacing:-.6px; line-height:1.1; }
+        .page-title .pi { width:38px; height:38px; border-radius:11px; background:var(--pri-50); color:var(--pri); display:inline-flex; align-items:center; justify-content:center; font-size:20px; flex:none; }
+        .page-sub { margin-top:7px; font-size:13px; color:var(--ink-3); }
+        .page-actions { display:flex; align-items:center; gap:10px; }
+        .sec-h { display:flex; align-items:center; gap:9px; font-size:14.5px; font-weight:700; color:var(--ink); margin-bottom:18px; }
+        .sec-h .si { width:26px; height:26px; border-radius:8px; background:var(--pri-50); color:var(--pri); display:inline-flex; align-items:center; justify-content:center; font-size:14px; flex:none; }
+        .section-title { color:var(--ink); font-weight:700; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+
+        /* ===== antd 组件覆盖 ===== */
+        .ant-btn { border-radius:var(--r-ctl) !important; font-weight:600; }
+        .ant-btn-primary { box-shadow:0 8px 18px -9px rgba(79,70,229,.75) !important; }
+        .ant-card { border-radius:var(--r-card) !important; box-shadow:var(--shadow) !important; border-color:var(--line) !important; }
+        .ant-card-head { border-bottom:1px solid var(--line-2) !important; min-height:54px !important; }
+        .ant-card-head-title { font-weight:700 !important; color:var(--ink) !important; }
+        .ant-table { font-size:13.5px; }
+        .ant-table-thead > tr > th { background:#fafbff !important; color:#7c869a !important; font-weight:600 !important; font-size:12px !important; border-bottom:1px solid var(--line) !important; }
+        .ant-table-tbody > tr > td { border-bottom:1px solid var(--line-2) !important; }
+        .ant-table-tbody > tr:hover > td { background:#fafbff !important; }
+        .ant-input, .ant-input-number, .ant-picker, .ant-select-selector, .ant-input-affix-wrapper { border-radius:var(--r-ctl) !important; }
+        .ant-modal-content { border-radius:18px !important; }
+        .ant-modal-header { border-radius:18px 18px 0 0 !important; }
+        .ant-tag { border-radius:999px !important; font-weight:600; border:none !important; }
+        .ant-pagination-item { border-radius:10px !important; }
+        .ant-pagination-item-active { border-color:var(--pri) !important; }
+        .ant-segmented { border-radius:12px !important; background:#f1f3f8 !important; }
+        .ant-segmented-item-selected { border-radius:9px !important; box-shadow:0 1px 3px rgba(16,24,40,.12) !important; }
+        .ant-divider-inner-text { font-weight:700; color:var(--ink-2); }
+        .ant-empty-description { color:var(--muted); }
+
+        /* ===== 通用交互 ===== */
+        .stat-chip { transition: box-shadow .18s ease, transform .18s ease, background .18s ease; }
+        .stat-chip.clickable:hover { box-shadow:0 6px 16px rgba(15,23,42,.12); transform:translateY(-1px); background:#fff; }
+        .order-row { transition: box-shadow .18s ease, transform .18s ease, border-color .18s ease, background .18s ease; }
+        .order-row:hover { background:#fff; border-color:var(--line); box-shadow:0 6px 16px rgba(15,23,42,.07); transform:translateY(-1px); }
+        .tbl-row { transition: background .16s ease; }
+        .tbl-row:hover { background:#fafbff !important; }
+        .filter-bar { border-radius:10px !important; }
+        .filter-bar:focus-within { border-color:var(--pri-100) !important; box-shadow:0 0 0 3px rgba(79,70,229,.12); }
+        .toolbar-btn { border-radius:10px !important; }
+        .icon-btn.ant-btn { width:28px; height:28px; border-radius:8px; color:var(--muted); display:inline-flex; align-items:center; justify-content:center; font-size:14px; }
+        .icon-btn.ant-btn:hover { background:var(--pri-50); color:var(--pri); }
+        .icon-btn-danger.ant-btn:hover { background:#fff1f0; color:#ff4d4f; }
+        .op-ico.ant-btn { display:inline-flex; align-items:center; gap:4px; padding:0 4px; height:auto; font-size:12.5px; }
+        .op-ico.ant-btn .anticon { font-size:12px; }
+
+        /* ===== 总览 ===== */
+        .ov-empty { padding:46px 0 42px; text-align:center; }
+        .ov-empty-ico { font-size:40px; color:#cbd5e1; line-height:1; margin-bottom:14px; }
+        .ov-empty-t { font-size:15px; font-weight:700; color:var(--ink); margin-bottom:5px; }
+        .ov-empty-s { font-size:12.5px; color:var(--muted); margin-bottom:16px; }
+        .ov-head-date { font-size:12.5px; color:var(--muted); }
+        .ov-panel { background:#fff; border:1px solid var(--line); border-radius:16px; overflow:hidden; box-shadow:var(--shadow); }
+
+        /* KPI 卡片行 */
+        .ov-kpis { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:4px 2px 20px; }
+        .ov-kpi { background:#fff; border:1px solid var(--line); border-radius:16px; padding:17px 18px 15px; box-shadow:var(--shadow); cursor:pointer; user-select:none; transition:box-shadow .18s ease, transform .18s ease, border-color .18s ease; }
+        .ov-kpi:hover { box-shadow:0 14px 28px -16px rgba(15,23,42,.32); transform:translateY(-2px); border-color:var(--pri-100); }
+        .ov-kpi-top { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+        .ov-kpi-ico { width:38px; height:38px; border-radius:11px; display:inline-flex; align-items:center; justify-content:center; font-size:19px; flex:none; }
+        .ov-kpi-num { font-size:31px; font-weight:800; color:var(--ink); letter-spacing:-1px; line-height:1; font-variant-numeric:tabular-nums; }
+        .ov-kpi-label { margin-top:13px; display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; color:var(--ink-3); white-space:nowrap; }
+        .ov-kpi.zero .ov-kpi-num { color:#cbd2dd; }
+        .ov-kpi.zero .ov-kpi-label { color:#b7bdc7; }
+        .ov-kpi.zero .ov-kpi-ico { color:#c3c9d4 !important; background:#f2f4f8 !important; }
+
+        /* 状态看板 */
+        .ov-board { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; padding:0 2px 4px; align-items:start; }
+        .ov-col { background:#fff; border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); overflow:hidden; }
+        .ov-col-h { display:flex; align-items:center; gap:8px; padding:12px 14px; border-bottom:1px solid var(--line-2); background:#fafbff; }
+        .ov-col-name { font-size:13px; font-weight:700; color:var(--ink); }
+        .ov-col-n { margin-left:auto; min-width:22px; height:20px; padding:0 7px; border-radius:999px; background:#eef1f6; color:var(--ink-2); font-size:12px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; font-variant-numeric:tabular-nums; }
+        .ov-col-body { display:flex; flex-direction:column; gap:10px; padding:12px; min-height:92px; }
+        .ov-col-empty { color:#c3c9d4; font-size:12.5px; text-align:center; padding:24px 0; }
+        .ov-card { border:1px solid var(--line); border-radius:12px; padding:11px 12px; background:#fff; cursor:pointer; user-select:text; -webkit-user-select:text; transition:box-shadow .16s ease, transform .16s ease, border-color .16s ease, background .16s ease; }
+        .ov-card:hover { border-color:var(--pri-100); background:#fafbff; box-shadow:0 10px 20px -14px rgba(15,23,42,.40); transform:translateY(-1px); }
+        .ov-card-h { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+        .ov-card-no { font-size:13.5px; font-weight:700; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:text; user-select:text; -webkit-user-select:text; }
+        .ov-card-route { margin-top:7px; font-size:12.5px; color:var(--ink-3); line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .ov-card-meta { margin-top:9px; display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+        .ov-card-fleet { color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        @media (max-width:1180px) {
+            .ov-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+            .ov-board { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        }
+        @media (max-width:900px) {
+            .app-shell { flex-direction:column; }
+            .app-side { width:100%; flex:none; position:static; }
+            .app-nav { flex-direction:row; flex-wrap:wrap; }
+        }
+        @media (max-width:620px) {
+            .ov-kpis { grid-template-columns:1fr; }
+            .ov-board { grid-template-columns:1fr; }
+            .ov-empty { padding:40px 0 36px; }
         }
     </style>
 </head>
@@ -202,13 +238,33 @@
         const { Title, Text } = Typography;
 
         // --- 打印模版组件 ---
+        // 等 React 把打印内容真正渲染进 #print-root 后再执行回调。
+        // 原来用固定 setTimeout(100ms) 就调 window.print()：首次生成派车单时同一帧还有
+        // 表单重置、message 动画、Modal 关闭、订单写入等大量 React 更新，portal 往往还没
+        // 渲染完，打印出来就是空白页（重新打印就好，是因为那时 DOM 已经在了）。
+        // maxFrames 兜底：等满约 1.5 秒也照样打印，不会卡死。
+        const waitPrintReady = (expectedKey, callback, maxFrames = 90) => {
+            let frames = 0;
+            const isReady = () => {
+                const root = document.getElementById('print-root');
+                if (!root || !root.firstElementChild) return false;
+                if (!expectedKey) return true;
+                return root.firstElementChild.getAttribute('data-print-key') === expectedKey;
+            };
+            const tick = () => {
+                if (isReady() || ++frames >= maxFrames) { callback(); return; }
+                requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+        };
+
         const DispatchSheetPrint = ({ data, addresses }) => {
             if (!data) return null;
 
             const getAddr = (id) => addresses.find(a => a.id === id) || {};
 
             return (
-                <div style={{ padding: '40px', fontFamily: '"Microsoft YaHei", "SimHei", sans-serif', color: '#000', fontSize: '14px', lineHeight: '1.5' }}>
+                <div data-print-key={data.shipmentId || data.poNumber || data.routeName || ''} style={{ padding: '40px', fontFamily: '"Microsoft YaHei", "SimHei", sans-serif', color: '#000', fontSize: '14px', lineHeight: '1.5' }}>
                     
                     {/* Header */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '3px solid #000', paddingBottom: '20px', marginBottom: '30px' }}>
@@ -779,15 +835,15 @@
                     const oldTitle = document.title;
                     document.title = fileName;
 
-                    // 延迟一小段时间等待 React 渲染打印内容
-                    setTimeout(() => {
+                    // 等打印内容真正渲染进 #print-root 再打印（固定延时在首次生成时会打出空白页）
+                    waitPrintReady(data.shipmentId || data.poNumber || data.routeName || '', () => {
                         window.print();
-                        
+
                         // 打印对话框关闭后恢复标题 (延迟执行以确保打印对话框已获取到标题)
                         setTimeout(() => {
                             document.title = oldTitle;
                         }, 1000);
-                    }, 100);
+                    });
                 });
             };
 
@@ -891,6 +947,12 @@
 
             return (
                 <div>
+                    <div className="page-head">
+                        <div className="page-head-l">
+                            <div className="page-title"><span className="pi">{React.createElement(icons.FileAddOutlined)}</span>派车单生成</div>
+                            <div className="page-sub">选择线路与单据类型，填写货物、站点信息，生成可打印派车单</div>
+                        </div>
+                    </div>
                     {/* 打印内容挂载 */}
                     {printData && ReactDOM.createPortal(
                         <DispatchSheetPrint data={printData} addresses={addresses} />,
@@ -898,10 +960,7 @@
                     )}
 
                     <Card bordered={false} style={{ marginBottom: 24, boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
-                        <div className="section-title" style={{ fontSize: '1.125rem', marginBottom: 24 }}>
-                            <span style={{ fontSize: '1.25rem' }}>📄</span>
-                            生成派车单
-                        </div>
+                        <div className="sec-h"><span className="si">{React.createElement(icons.ProfileOutlined)}</span>线路与单据信息</div>
                         
                         <Form form={form} layout="vertical">
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16, alignItems: 'start' }}>
@@ -933,8 +992,8 @@
                                         block
                                         size="large"
                                         options={[
-                                            { label: '📄 正式派车单', value: false },
-                                            { label: '⏰ 预定单', value: true }
+                                            { label: '正式派车单', value: false },
+                                            { label: '预定单', value: true }
                                         ]}
                                         onChange={(val) => {
                                             const pre = !!val;
@@ -1117,9 +1176,9 @@
                                                             size="large"
                                                             variant="filled"
                                                             options={[
-                                                                { label: '📤 提货', value: 'pickup' },
-                                                                { label: '📥 送货', value: 'delivery' },
-                                                                { label: '🏢 物流园', value: 'logistics' }
+                                                                { label: '提货', value: 'pickup' },
+                                                                { label: '送货', value: 'delivery' },
+                                                                { label: '物流园', value: 'logistics' }
                                                             ]}
                                                         />
                                                         <Select
@@ -1206,7 +1265,7 @@
                                     {editingOrder ? (
                                         <>
                                             <Button size="large" onClick={onCancelEdit}>取消编辑</Button>
-                                            <Button size="large" onClick={handleSaveDraft}>💾 存为草稿</Button>
+                                            <Button size="large" onClick={handleSaveDraft} icon={React.createElement(icons.SaveOutlined)}>存为草稿</Button>
                                             <Button type="primary" size="large" style={{ boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }} onClick={handleGenerate}>
                                                 {isPreOrder ? '保存预定单' : '保存修改并更新记录'}
                                             </Button>
@@ -1214,7 +1273,7 @@
                                     ) : (
                                         <>
                                             <Button size="large" onClick={handleReset}>重置</Button>
-                                            <Button size="large" onClick={handleSaveDraft}>💾 保存草稿</Button>
+                                            <Button size="large" onClick={handleSaveDraft} icon={React.createElement(icons.SaveOutlined)}>保存草稿</Button>
                                             <Button type="primary" size="large" style={{ boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }} onClick={handleGenerate}>
                                                 {isPreOrder ? '保存预定单' : '确认生成派车单 (PDF)'}
                                             </Button>
@@ -1253,9 +1312,9 @@
                     width: 150,
                     render: (_, record) => (
                         <Space size="small">
-                            <Button type="primary" size="small" onClick={() => handleEdit(record)}>编辑</Button>
+                            <Button type="link" size="small" onClick={() => handleEdit(record)}>编辑</Button>
                             <Popconfirm title="确定删除?" onConfirm={() => handleDelete(record.id)}>
-                                <Button type="primary" danger size="small">删除</Button>
+                                <Button type="link" danger size="small">删除</Button>
                             </Popconfirm>
                         </Space>
                     ),
@@ -1337,15 +1396,21 @@
 
             return (
                 <div>
-                    <Card bordered={false} style={{ boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                    <div className="page-head">
+                        <div className="page-head-l">
+                            <div className="page-title"><span className="pi">{React.createElement(icons.EnvironmentOutlined)}</span>地址库管理</div>
+                            <div className="page-sub">维护工厂、物流园等地址，内部注意事项会在派车时自动提醒</div>
+                        </div>
+                    </div>
+                    <Card bordered={false}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                                <div style={{ fontSize: '1.125rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                                    地址列表 <span style={{fontSize: '0.875rem', color: '#6b7280', fontWeight: 'normal'}}>({filteredAddresses.length})</span>
+                                <div style={{ fontSize: '1.05rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                    地址列表 <span style={{fontSize: '0.875rem', color: 'var(--muted)', fontWeight: 500}}>({filteredAddresses.length})</span>
                                 </div>
                                 <Input 
                                     placeholder="搜索名称、地址或联系人..." 
-                                    prefix={<span style={{ color: '#9ca3af', fontSize: '1.125rem' }}>🔍</span>} 
+                                    prefix={React.createElement(icons.SearchOutlined, { style: { color: 'var(--muted)' } })} 
                                     value={searchText}
                                     onChange={e => setSearchText(e.target.value)}
                                     style={{ width: 350 }}
@@ -1360,19 +1425,15 @@
                                         type="primary" 
                                         onClick={() => setIsBatchModalVisible(true)}
                                         size="large"
-                                        shape="round"
-                                        style={{ boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}
                                     >
                                         批量修改 ({selectedRowKeys.length})
                                     </Button>
                                 )}
                                 <Button 
                                     type="primary" 
-                                    icon={<span>+</span>} 
+                                    icon={React.createElement(icons.PlusOutlined)} 
                                     onClick={() => { setEditingId(null); form.resetFields(); setIsModalOpen(true); }}
                                     size="large"
-                                    shape="round"
-                                    style={{ boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}
                                 >
                                     新增地址
                                 </Button>
@@ -1392,7 +1453,7 @@
                     <Modal
                         title={
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: '1.5rem' }}>🛠️</span>
+                                <span style={{ fontSize: '1.25rem', color: 'var(--pri)' }}>{React.createElement(icons.EditOutlined)}</span>
                                 <span>批量修改地址</span>
                             </div>
                         }
@@ -1636,11 +1697,17 @@
             };
 
             return (
-                <div style={{ maxWidth: 1000, margin: '0 auto' }}>
-                    <Card bordered={false} style={{ marginBottom: 24, boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
+                <div>
+                    <div className="page-head">
+                        <div className="page-head-l">
+                            <div className="page-title"><span className="pi">{React.createElement(icons.BranchesOutlined)}</span>{editingRoute ? '编辑路线' : 'DIY 路线规划'}</div>
+                            <div className="page-sub">编排站点顺序与默认货物信息，沉淀可复用路线模板</div>
+                        </div>
+                    </div>
+                    <Card bordered={false} style={{ marginBottom: 24 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                            <div className="section-title" style={{ fontSize: '1.25rem' }}>
-                                <span style={{ fontSize: '1.5rem' }}>📝</span>
+                            <div className="sec-h" style={{ marginBottom: 0 }}>
+                                <span className="si">{React.createElement(icons.ProfileOutlined)}</span>
                                 {editingRoute ? '编辑路线信息' : '新建路线规划'}
                             </div>
                             {editingRoute && (
@@ -1677,8 +1744,8 @@
 
                     <Card bordered={false} style={{ marginBottom: 24, boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                            <div className="section-title" style={{ fontSize: '1.125rem' }}>
-                                <span style={{ fontSize: '1.25rem' }}>📍</span>
+                            <div className="sec-h" style={{ marginBottom: 0 }}>
+                                <span className="si">{React.createElement(icons.EnvironmentOutlined)}</span>
                                 站点选择 ({stops.length})
                             </div>
                             <Button type="primary" ghost onClick={handleAddStop} icon={<span>+</span>} shape="round">添加站点</Button>
@@ -1708,7 +1775,7 @@
                                         transition: 'all 0.2s ease'
                                     }}
                                 >
-                                    <div style={{ backgroundColor: '#2563eb', color: 'white', borderRadius: 9999, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', flexShrink: 0 }}>
+                                    <div style={{ backgroundColor: 'var(--pri)', color: 'white', borderRadius: 12, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, boxShadow: '0 6px 12px -6px rgba(79,70,229,.85)', flexShrink: 0 }}>
                                         {index + 1}
                                     </div>
                                     <Select
@@ -1718,9 +1785,9 @@
                                         size="large"
                                         variant="filled"
                                         options={[
-                                            { label: '📤 提货', value: 'pickup' },
-                                            { label: '📥 送货', value: 'delivery' },
-                                            { label: '🏢 物流园', value: 'logistics' }
+                                            { label: '提货', value: 'pickup' },
+                                            { label: '送货', value: 'delivery' },
+                                            { label: '物流园', value: 'logistics' }
                                         ]}
                                     />
                                     <Select 
@@ -1762,9 +1829,9 @@
                         </div>
                     </Card>
 
-                    <Card bordered={false} style={{ marginBottom: 32, boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', background: 'linear-gradient(to bottom, #ffffff, #f8fafc)' }}>
-                        <div className="section-title" style={{ fontSize: '1.125rem', marginBottom: 24 }}>
-                            <span style={{ fontSize: '1.25rem' }}>📦</span>
+                    <Card bordered={false} style={{ marginBottom: 32 }}>
+                        <div className="sec-h">
+                            <span className="si">{React.createElement(icons.InboxOutlined)}</span>
                             货物信息
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 24 }}>
@@ -1837,7 +1904,7 @@
                             size="large" 
                             block 
                             onClick={handleSaveRoute} 
-                            style={{ height: 56, fontSize: 18, fontWeight: 'bold', borderRadius: 28, background: 'linear-gradient(to right, #2563eb, #3b82f6)', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }} 
+                            style={{ height: 48, fontSize: 16, fontWeight: 700, borderRadius: 12 }} 
                             disabled={stops.length === 0}
                         >
                             {editingRoute ? '更新路线信息' : '保存并生成路线'}
@@ -1918,9 +1985,9 @@
                     width: 150,
                     render: (_, record) => (
                         <Space size="small">
-                            <Button type="primary" size="small" onClick={() => handleEditRoute(record)}>编辑</Button>
+                            <Button type="link" size="small" onClick={() => handleEditRoute(record)}>编辑</Button>
                             <Popconfirm title="确定删除此路线?" onConfirm={() => handleDeleteRoute(record.id)}>
-                                <Button type="primary" danger size="small">删除</Button>
+                                <Button type="link" danger size="small">删除</Button>
                             </Popconfirm>
                         </Space>
                     )
@@ -1932,7 +1999,7 @@
                     <div style={{ backgroundColor: '#f9fafb', padding: 16, borderRadius: 4 }}>
                         {record.cargo && record.cargo.note && (
                             <div style={{ marginBottom: 16 }}>
-                                <Text strong style={{ display: 'block', marginBottom: 4, color: '#ea580c' }}>📝 货物/操作备注：</Text>
+                                <Text strong style={{ display: 'block', marginBottom: 4, color: 'var(--pri)' }}>货物 / 操作备注</Text>
                                 <div style={{ padding: 8, backgroundColor: '#fefce8', borderWidth: 1, borderColor: '#fef9c3', borderStyle: 'solid', borderRadius: 4, color: '#374151', whiteSpace: 'pre-wrap' }}>
                                     {record.cargo.note}
                                 </div>
@@ -2022,15 +2089,21 @@
 
             return (
                 <div>
-                    <Card bordered={false} style={{ marginBottom: 24, boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                    <div className="page-head">
+                        <div className="page-head-l">
+                            <div className="page-title"><span className="pi">{React.createElement(icons.GlobalOutlined)}</span>线路管理</div>
+                            <div className="page-sub">维护路线模板、时效与货物概览，展开行可看站点明细</div>
+                        </div>
+                    </div>
+                    <Card bordered={false} style={{ marginBottom: 24 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                                <div style={{ fontSize: '1.125rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                                    线路列表 <span style={{fontSize: '0.875rem', color: '#6b7280', fontWeight: 'normal'}}>({filteredRoutes.length})</span>
+                                <div style={{ fontSize: '1.05rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                    线路列表 <span style={{fontSize: '0.875rem', color: 'var(--muted)', fontWeight: 500}}>({filteredRoutes.length})</span>
                                 </div>
                                 <Input 
                                     placeholder="搜索路线名称或货物信息..." 
-                                    prefix={<span style={{ color: '#9ca3af', fontSize: '1.125rem' }}>🔍</span>} 
+                                    prefix={React.createElement(icons.SearchOutlined, { style: { color: 'var(--muted)' } })} 
                                     value={searchText}
                                     onChange={e => setSearchText(e.target.value)}
                                     style={{ width: 350 }}
@@ -2066,7 +2139,7 @@
                     <Modal
                         title={
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: '1.5rem' }}>🛠️</span>
+                                <span style={{ fontSize: '1.25rem', color: 'var(--pri)' }}>{React.createElement(icons.EditOutlined)}</span>
                                 <span>批量修改路线</span>
                             </div>
                         }
@@ -2150,13 +2223,13 @@
                 const oldTitle = document.title;
                 document.title = fileName;
 
-                setTimeout(() => {
+                waitPrintReady(record.shipmentId || record.poNumber || record.routeName || '', () => {
                     window.print();
                     setTimeout(() => {
                         document.title = oldTitle;
-                        setPrintData(null); 
+                        setPrintData(null);
                     }, 1000);
-                }, 100);
+                });
             };
 
             const handleExport = () => {
@@ -2444,9 +2517,9 @@
                 {
                     title: '操作',
                     key: 'action',
-                    width: 300,
+                    width: 176,
                     render: (_, record) => (
-                        <Space size={4} wrap>
+                        <Space size={2} wrap>
                             {record.isDraft && (
                                 <Button type="primary" size="small" onClick={() => onEditOrder(record)}>
                                     继续完善
@@ -2457,21 +2530,23 @@
                                     完善并派车
                                 </Button>
                             )}
-                            <Button type="link" size="small" style={{ padding: '0 4px' }} onClick={() => setViewData(record)}>
-                                查看
+                            <Button type="text" size="small" className="icon-btn" title="查看" onClick={() => setViewData(record)}>
+                                {React.createElement(icons.EyeOutlined)}
                             </Button>
                             {!record.isPreOrder && !record.isDraft && (
-                                <Button type="link" size="small" style={{ padding: '0 4px' }} onClick={() => handleReprint(record)}>
-                                    打印
+                                <Button type="text" size="small" className="icon-btn" title="重新打印" onClick={() => handleReprint(record)}>
+                                    {React.createElement(icons.PrinterOutlined)}
                                 </Button>
                             )}
                             {!record.isPreOrder && !record.isDraft && (
-                                <Button type="link" size="small" style={{ padding: '0 4px' }} onClick={() => onEditOrder(record)}>
-                                    编辑
+                                <Button type="text" size="small" className="icon-btn" title="编辑" onClick={() => onEditOrder(record)}>
+                                    {React.createElement(icons.EditOutlined)}
                                 </Button>
                             )}
                             <Popconfirm title="确定删除？" onConfirm={() => handleDelete(record.id)}>
-                                <Button type="link" size="small" danger style={{ padding: '0 4px' }}>删除</Button>
+                                <Button type="text" size="small" className="icon-btn icon-btn-danger" title="删除">
+                                    {React.createElement(icons.DeleteOutlined)}
+                                </Button>
                             </Popconfirm>
                             <Tag
                                 color={record.isExported ? 'success' : 'default'}
@@ -2487,6 +2562,12 @@
 
             return (
                 <div>
+                    <div className="page-head">
+                        <div className="page-head-l">
+                            <div className="page-title"><span className="pi">{React.createElement(icons.UnorderedListOutlined)}</span>订单记录</div>
+                            <div className="page-sub">查看、筛选、导出与重新打印历史派车单</div>
+                        </div>
+                    </div>
                     {printData && ReactDOM.createPortal(
                         <DispatchSheetPrint data={printData} addresses={addresses} />,
                         document.getElementById('print-root')
@@ -2496,7 +2577,7 @@
                     <Modal
                         title={
                             <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
-                                <span style={{fontSize: 20}}>🔍</span>
+                                <span style={{fontSize: 18, color: 'var(--pri)'}}>{React.createElement(icons.SearchOutlined)}</span>
                                 <span>订单预览</span>
                             </div>
                         }
@@ -2510,7 +2591,7 @@
                                 setViewData(null);
                                 handleReprint(record);
                             }}>
-                                🖨️ 打印
+                                {React.createElement(icons.PrinterOutlined)} 打印
                             </Button>
                         ]}
                     >
@@ -2545,19 +2626,14 @@
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                 <span style={{
-                                    width: 32, height: 32, borderRadius: 10, background: '#eef4ff',
-                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 16
-                                }}>📋</span>
-                                <span style={{ fontSize: 17, fontWeight: 700, color: '#1f2937' }}>历史订单记录</span>
-                                <span style={{
-                                    padding: '2px 10px', borderRadius: 999, background: '#f3f5f9',
-                                    color: '#6b7280', fontSize: 13, fontWeight: 600
-                                }}>{filteredOrders.length} 条</span>
+                                    padding: '3px 12px', borderRadius: 999, background: 'var(--pri-50)',
+                                    color: 'var(--pri)', fontSize: 13, fontWeight: 700
+                                }}>{filteredOrders.length} 条记录</span>
                             </div>
                             <Space>
-                                <Button className="toolbar-btn" onClick={handleExport} icon={<span>📊</span>}>导出Excel</Button>
-                                <Button className="toolbar-btn" danger onClick={handleBatchDelete} icon={<span>🗑️</span>} disabled={selectedRowKeys.length === 0}>批量删除</Button>
-                                <Button className="toolbar-btn" onClick={refreshOrders} icon={<span>🔄</span>}>刷新</Button>
+                                <Button className="toolbar-btn" onClick={handleExport} icon={React.createElement(icons.FileExcelOutlined)}>导出Excel</Button>
+                                <Button className="toolbar-btn" danger onClick={handleBatchDelete} icon={React.createElement(icons.DeleteOutlined)} disabled={selectedRowKeys.length === 0}>批量删除</Button>
+                                <Button className="toolbar-btn" onClick={refreshOrders} icon={React.createElement(icons.ReloadOutlined)}>刷新</Button>
                             </Space>
                         </div>
 
@@ -2569,7 +2645,7 @@
                             <Input
                                 className="filter-bar"
                                 placeholder="搜索 Shipment ID / PO / 路线 / 车队..."
-                                prefix={<span style={{ color: '#9ca3af' }}>🔍</span>}
+                                prefix={React.createElement(icons.SearchOutlined, { style: { color: 'var(--muted)' } })}
                                 value={searchText}
                                 onChange={e => setSearchText(e.target.value)}
                                 style={{ width: 330 }}
@@ -2580,8 +2656,8 @@
                                 onChange={setStatusFilter}
                                 options={[
                                     { label: '全部', value: 'all' },
-                                    { label: '⏰ 预定单', value: 'pre' },
-                                    { label: '📝 草稿', value: 'draft' }
+                                    { label: '预定单', value: 'pre' },
+                                    { label: '草稿', value: 'draft' }
                                 ]}
                             />
                             <DatePicker.RangePicker
@@ -2592,7 +2668,7 @@
                             />
                             <span style={{
                                 marginLeft: 'auto', fontSize: 12.5, fontWeight: 600,
-                                color: selectedRowKeys.length > 0 ? '#1677ff' : '#9aa3af'
+                                color: selectedRowKeys.length > 0 ? '#2563eb' : '#9aa3af'
                             }}>
                                 {selectedRowKeys.length > 0 ? '已选择 ' + selectedRowKeys.length + ' 项' : '未选择记录'}
                             </span>
@@ -2710,164 +2786,88 @@
                 setDraftOrders(data.filter(o => o.isDraft));
             };
 
-            // ---- 总览：状态胶囊 + 分类表格（列头对齐、横向铺满） ----
-            const StatChip = ({ icon, label, value, color, onClick }) => (
-                <div
-                    onClick={onClick}
-                    className={onClick ? 'stat-chip clickable' : 'stat-chip'}
-                    style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 7,
-                        padding: '6px 13px', borderRadius: 999,
-                        background: color + '12', border: '1px solid ' + color + '26',
-                        cursor: onClick ? 'pointer' : 'default', userSelect: 'none'
-                    }}
-                >
-                    <span style={{ fontSize: 13.5 }}>{icon}</span>
-                    <span style={{ fontSize: 12.5, color: '#6b7280', fontWeight: 500 }}>{label}</span>
-                    <span style={{ fontSize: 14.5, fontWeight: 800, color: color }}>{value}</span>
-                </div>
-            );
-
+            // ---- 总览 v8：KPI 卡片行 + 状态看板（预定单与草稿合并为一列，无小色点） ----
             const fmtMD = (v) => (v ? dayjs(v).format('MM-DD') : '-');
 
-            const cellId = (o) => (
-                <span title={o.shipmentId || o.poNumber || '未填单号'} style={{ fontWeight: 700, color: '#1f2937' }}>
-                    {o.shipmentId || o.poNumber || '未填单号'}
-                </span>
-            );
-            const cellRoute = (o) => (
-                <span title={o.routeName || ''} style={{ color: '#4b5563' }}>{o.routeName || '-'}</span>
-            );
-            const cellDate = (v, color) => (
-                <span style={{ color: v ? (color || '#374151') : '#c3c9d4', fontWeight: v ? 600 : 400 }}>{fmtMD(v)}</span>
-            );
-            const cellFleet = (o) => <span style={{ color: '#4b5563' }}>{o.fleet || '-'}</span>;
-            const cellOp = (label, color, onClick) => (
-                <Button size="small" type="link" style={{ padding: 0, height: 'auto', fontWeight: 600, color: color }} onClick={onClick}>{label}</Button>
-            );
+            const ICO = { mixed: 'RocketOutlined', pending: 'ClockCircleOutlined', transit: 'CarOutlined' };
 
-            // 列定义：宽度用 fr 自适应铺满整行；日期用 MM-DD 保证窄列也读得全
-            const C_ID = { label: 'Shipment ID', width: 'minmax(0, 1.05fr)', cell: cellId };
-            const C_ROUTE = { label: '路线', width: 'minmax(0, 1.7fr)', cell: cellRoute };
-            const C_PICK = { label: '提货日期', width: 'minmax(0, 1fr)', cell: (o) => cellDate(o.pickupDate, '#b45309') };
-            const C_DELIV = { label: '送货日期', width: 'minmax(0, 1fr)', cell: (o) => cellDate(o.deliveryDate, '#15803d') };
-            const C_FLEET = { label: '承运车队', width: 'minmax(0, 1fr)', cell: cellFleet };
-            const COL_OP = (color, label, onClick) => ({ label: '操作', width: '82px', cell: (o) => cellOp(label, color, typeof onClick === 'function' ? () => onClick(o) : null) });
+            const groups = [
+                { key: 'mixed',   dot: '#ef4444', label: '预定单 / 草稿', items: pendingPreOrders.map(o => ({ ...o, _st: 'pre' })).concat(draftOrders.map(o => ({ ...o, _st: 'draft' }))) },
+                { key: 'pending', dot: '#f59e0b', label: '准备派车',      items: pendingDispatch.map(o => ({ ...o, _st: 'pending' })) },
+                { key: 'transit', dot: '#10b981', label: '运输中',        items: inTransit.map(o => ({ ...o, _st: 'transit' })) }
+            ];
+            const total = groups.reduce((s, g) => s + g.items.length, 0);
+            const mixedCount = pendingPreOrders.length + draftOrders.length;
 
-            const Section = ({ icon, title, count, color, columns, items }) => (
-                <div style={{ marginBottom: 16 }}>
-                    <div style={{
-                        display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9,
-                        paddingLeft: 9, borderLeft: '3px solid ' + color
-                    }}>
-                        <span style={{ fontSize: 15 }}>{icon}</span>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: '#374151' }}>{title}</span>
-                        <span style={{
-                            padding: '0px 9px', borderRadius: 999, background: color + '14',
-                            color: color, fontSize: 12.5, fontWeight: 700
-                        }}>{count}</span>
-                    </div>
-                    <div style={{ border: '1px solid #edf0f5', borderRadius: 12, overflow: 'hidden' }}>
-                        <div style={{
-                            display: 'grid', gridTemplateColumns: columns.map(c => c.width).join(' '),
-                            background: '#fafbfd', borderBottom: '1px solid #edf0f5'
-                        }}>
-                            {columns.map((c, i) => (
-                                <div key={i} style={{
-                                    padding: '8px 8px', fontSize: 12, fontWeight: 600, color: '#8a93a2',
-                                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                                }}>{c.label}</div>
-                            ))}
+            const summary = total === 0 ? '暂无待办，所有单都在正常推进中'
+                : (pendingDispatch.length > 0 ? '今天有 ' + pendingDispatch.length + ' 单需要安排派车'
+                    : (mixedCount > 0 ? mixedCount + ' 单预定单/草稿待处理'
+                        : inTransit.length + ' 单在途运输中，无需操作'));
+
+            const orderNo = (o) => o.shipmentId || o.poNumber || '未填单号';
+            const goOrder = (o) => {
+                if (o._st === 'draft') { if (onEditOrder) onEditOrder(o); }
+                else { onNavigate('5'); if (onHighlightOrder) onHighlightOrder(o.id); }
+            };
+
+            return (
+                <div style={{ padding: '0 2px' }}>
+                    <div className="page-head">
+                        <div className="page-head-l">
+                            <div className="page-title"><span className="pi">{React.createElement(icons.DashboardOutlined)}</span>总览</div>
+                            <div className="page-sub">{summary}</div>
                         </div>
-                        {items.map((o, idx) => (
-                            <div key={o.id} className="tbl-row" style={{
-                                display: 'grid', gridTemplateColumns: columns.map(c => c.width).join(' '),
-                                alignItems: 'center', background: '#fff',
-                                borderTop: idx === 0 ? 'none' : '1px solid #f3f6fa'
-                            }}>
-                                {columns.map((c, i) => (
-                                    <div key={i} style={{
-                                        padding: '9px 8px', minWidth: 0, fontSize: 13,
-                                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                                    }}>{c.cell(o)}</div>
-                                ))}
+                    </div>
+
+                    <div className="ov-kpis">
+                        {groups.map(g => (
+                            <div key={g.key} className={'ov-kpi' + (g.items.length === 0 ? ' zero' : '')} onClick={() => onNavigate('5')} title={'查看' + g.label}>
+                                <div className="ov-kpi-top">
+                                    <span className="ov-kpi-ico" style={{ color: g.dot, background: g.dot + '1a' }}>{React.createElement(icons[ICO[g.key]])}</span>
+                                    <span className="ov-kpi-num">{g.items.length}</span>
+                                </div>
+                                <div className="ov-kpi-label">{g.label}</div>
                             </div>
                         ))}
                     </div>
-                </div>
-            );
 
-            const sections = [
-                {
-                    key: 'pre', icon: '⏰', title: '预定单派车', count: pendingPreOrders.length,
-                    color: '#d4380d', items: pendingPreOrders,
-                    columns: [C_ID, C_ROUTE,
-                        { label: '提醒日期', width: 'minmax(0, 1fr)', cell: (o) => cellDate(o.reminderDate, '#d4380d') },
-                        C_PICK, C_FLEET,
-                        COL_OP('#d4380d', '去派车', (o) => { onHighlightOrder(o.id); onNavigate('5'); })
-                    ]
-                },
-                {
-                    key: 'pending', icon: '📢', title: '准备派车', count: pendingDispatch.length,
-                    color: '#b45309', items: pendingDispatch,
-                    columns: [C_ID, C_ROUTE, C_PICK, C_FLEET,
-                        COL_OP('#b45309', '查看详情', (o) => { onNavigate('5'); if (onHighlightOrder) onHighlightOrder(o.id); })
-                    ]
-                },
-                {
-                    key: 'transit', icon: '🚚', title: '运输中', count: inTransit.length,
-                    color: '#15803d', items: inTransit,
-                    columns: [C_ID, C_ROUTE, C_PICK, C_DELIV, C_FLEET,
-                        COL_OP('#15803d', '查看详情', (o) => { onNavigate('5'); if (onHighlightOrder) onHighlightOrder(o.id); })
-                    ]
-                },
-                {
-                    key: 'draft', icon: '📝', title: '草稿待完善', count: draftOrders.length,
-                    color: '#0891b2', items: draftOrders,
-                    columns: [C_ID, C_ROUTE,
-                        { label: '最后编辑', width: 'minmax(0, 1.2fr)', cell: (o) => <span style={{ color: '#0891b2', fontWeight: 600 }}>{o.updatedAt ? dayjs(o.updatedAt).format('MM-DD HH:mm') : '-'}</span> },
-                        C_FLEET,
-                        COL_OP('#0891b2', '继续完善', (o) => { if (onEditOrder) onEditOrder(o); })
-                    ]
-                }
-            ];
-            const activeSections = sections.filter(s => s.items.length > 0);
-
-            return (
-                <div style={{ padding: '0 8px' }}>
-                    <div style={{
-                        background: '#fff', borderRadius: 16, border: '1px solid #eef1f5',
-                        boxShadow: '0 4px 16px rgba(15,23,42,0.05)', overflow: 'hidden'
-                    }}>
-                        {/* 顶部一行状态胶囊：指标一览 + 点击直达 */}
-                        <div style={{
-                            display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8,
-                            padding: '14px 18px', borderBottom: '1px solid #f2f4f8'
-                        }}>
-                            <span style={{ fontSize: 16, fontWeight: 800, color: '#1f2937', marginRight: 4 }}>总览</span>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginLeft: 'auto' }}>
-                                <StatChip icon="⏰" label="预定单派车" value={pendingPreOrders.length} color="#d4380d" onClick={() => onNavigate('5')} />
-                                <StatChip icon="📢" label="准备派车" value={pendingDispatch.length} color="#b45309" onClick={() => onNavigate('5')} />
-                                <StatChip icon="🚚" label="运输中" value={inTransit.length} color="#15803d" onClick={() => onNavigate('5')} />
-                                <StatChip icon="📝" label="草稿" value={draftOrders.length} color="#0891b2" onClick={() => onNavigate('5')} />
+                    {total === 0 ? (
+                        <div className="ov-panel">
+                            <div className="ov-empty">
+                                <div className="ov-empty-ico">{React.createElement(icons.CheckCircleFilled)}</div>
+                                <div className="ov-empty-t">目前没有需要处理的派车单</div>
+                                <div className="ov-empty-s">所有单都在正常推进中</div>
+                                <Button type="primary" onClick={() => onNavigate('4')}>去生成派车单</Button>
                             </div>
                         </div>
-
-                        {/* 分类表格：宽屏左右并排，窄屏自动上下排；表格列自适应铺满整行 */}
-                        <div style={{
-                            padding: '2px 18px 16px',
-                            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(520px, 1fr))',
-                            gap: '0 24px', alignItems: 'start'
-                        }}>
-                            {activeSections.length === 0 ? (
-                                <div style={{ gridColumn: '1 / -1', padding: '34px 0', textAlign: 'center', color: '#9aa3af', fontSize: 13.5 }}>
-                                    ✓ 暂无需要处理的派车单
+                    ) : (
+                        <div className="ov-board">
+                            {groups.map(g => (
+                                <div key={g.key} className="ov-col">
+                                    <div className="ov-col-h">
+                                        <span className="ov-col-name">{g.label}</span>
+                                        <span className="ov-col-n">{g.items.length}</span>
+                                    </div>
+                                    <div className="ov-col-body">
+                                        {g.items.length === 0 ? (
+                                            <div className="ov-col-empty">暂无</div>
+                                        ) : g.items.map(o => (
+                                            <div key={o.id} className="ov-card" onClick={() => { var s = window.getSelection ? String(window.getSelection()).trim() : ""; if (s) return; goOrder(o); }} title="点击查看">
+                                                <div className="ov-card-h">
+                                                    <span className="ov-card-no" onClick={(e) => e.stopPropagation()} title="拖选可复制单号">{orderNo(o)}</span>
+                                                </div>
+                                                <div className="ov-card-route">{o.routeName || '-'}</div>
+                                                <div className="ov-card-meta">
+                                                    <span>{fmtMD(o.pickupDate)} → {fmtMD(o.deliveryDate)}</span>
+                                                    <span className="ov-card-fleet">{o.fleet || '-'}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                            ) : activeSections.map(s => (
-                                <Section key={s.key} icon={s.icon} title={s.title} count={s.count} color={s.color} columns={s.columns} items={s.items} />
                             ))}
                         </div>
-                    </div>
+                    )}
                 </div>
             );
         };
@@ -2944,29 +2944,31 @@
             ];
 
             return (
-                <div style={{ padding: '0 8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                        <div className="section-title" style={{ fontSize: '1.25rem', margin: 0 }}>
-                            <span style={{ fontSize: '1.5rem' }}>📈</span> 数据分析与财务统计
+                <div>
+                    <div className="page-head">
+                        <div className="page-head-l">
+                            <div className="page-title"><span className="pi">{React.createElement(icons.BarChartOutlined)}</span>数据分析</div>
+                            <div className="page-sub">运力车队与月度货量统计</div>
                         </div>
-                        <Select 
-                            value={year} 
-                            onChange={setYear} 
-                            style={{ width: 120 }} 
-                            size="large"
-                            options={[
-                                { value: dayjs().year() + 1, label: `${dayjs().year() + 1}年` },
-                                { value: dayjs().year(), label: `${dayjs().year()}年` },
-                                { value: dayjs().year() - 1, label: `${dayjs().year() - 1}年` }
-                            ]}
-                        />
+                        <div className="page-actions">
+                            <Select 
+                                value={year} 
+                                onChange={setYear} 
+                                style={{ width: 120 }} 
+                                size="large"
+                                options={[
+                                    { value: dayjs().year() + 1, label: `${dayjs().year() + 1}年` },
+                                    { value: dayjs().year(), label: `${dayjs().year()}年` },
+                                    { value: dayjs().year() - 1, label: `${dayjs().year() - 1}年` }
+                                ]}
+                            />
+                        </div>
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
                         <Card 
-                            title={<><span style={{marginRight: 8}}>🚚</span>运力/车队统计报表</>} 
-                            bordered={false} 
-                            style={{ boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                            title={<><span style={{marginRight: 8, color: 'var(--pri)'}}>{React.createElement(icons.CarOutlined)}</span>运力 / 车队统计</>} 
+                            bordered={false}
                         >
                             <Table 
                                 dataSource={fleetStats} 
@@ -2978,9 +2980,8 @@
                         </Card>
 
                         <Card 
-                            title={<><span style={{marginRight: 8}}>📦</span>货量月度总结 ({year}年)</>} 
-                            bordered={false} 
-                            style={{ boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                            title={<><span style={{marginRight: 8, color: 'var(--pri)'}}>{React.createElement(icons.InboxOutlined)}</span>货量月度总结 ({year}年)</>} 
+                            bordered={false}
                         >
                             <Table 
                                 dataSource={monthlyStats} 
@@ -3103,7 +3104,7 @@
             const items = [
                 {
                     key: '0',
-                    label: <span style={{fontSize: 16}}>📊 总览</span>,
+                    label: <span className="app-nav-label"><icons.DashboardOutlined className="app-nav-ico" />总览</span>,
                     children: <Overview 
                         onNavigate={setActiveTab} 
                         onEditOrder={handleEditOrder}
@@ -3115,7 +3116,7 @@
                 },
                 {
                     key: '4',
-                    label: <span style={{fontSize: 16}}>📄 派车单生成</span>,
+                    label: <span className="app-nav-label"><icons.FileAddOutlined className="app-nav-ico" />派车单生成</span>,
                     children: <DispatchGenerator 
                         routes={routes} 
                         addresses={addresses} 
@@ -3127,7 +3128,7 @@
                 },
                 {
                     key: '5',
-                    label: <span style={{fontSize: 16}}>🗓️ 订单记录</span>,
+                    label: <span className="app-nav-label"><icons.UnorderedListOutlined className="app-nav-ico" />订单记录</span>,
                     children: <OrderManagement 
                         addresses={addresses}
                         onEditOrder={handleEditOrder}
@@ -3136,7 +3137,7 @@
                 },
                 {
                     key: '2',
-                    label: <span style={{fontSize: 16}}>🚚 DIY 路线规划</span>,
+                    label: <span className="app-nav-label"><icons.BranchesOutlined className="app-nav-ico" />DIY 路线规划</span>,
                     children: <RoutePlanning 
                         addresses={addresses} 
                         routes={routes} 
@@ -3148,7 +3149,7 @@
                 },
                 {
                     key: '3',
-                    label: <span style={{fontSize: 16}}>📋 线路管理</span>,
+                    label: <span className="app-nav-label"><icons.GlobalOutlined className="app-nav-ico" />线路管理</span>,
                     children: <RouteManagement 
                         routes={routes} 
                         addresses={addresses} 
@@ -3159,12 +3160,12 @@
                 },
                 {
                     key: '6',
-                    label: <span style={{fontSize: 16}}>📈 数据分析</span>,
+                    label: <span className="app-nav-label"><icons.BarChartOutlined className="app-nav-ico" />数据分析</span>,
                     children: <DataAnalysis />,
                 },
                 {
                     key: '1',
-                    label: <span style={{fontSize: 16}}>🏢 地址库管理</span>,
+                    label: <span className="app-nav-label"><icons.EnvironmentOutlined className="app-nav-ico" />地址库管理</span>,
                     children: <AddressLibrary addresses={addresses} setAddresses={setAddresses} />,
                 },
             ];
@@ -3173,7 +3174,7 @@
                 <ConfigProvider
                     theme={{
                         token: {
-                            colorPrimary: '#1677ff',
+                            colorPrimary: '#4f46e5',
                             borderRadius: 10,
                             colorBgContainer: '#ffffff',
                         },
@@ -3182,7 +3183,7 @@
                     <div className="app-shell">
                         <aside className="app-side">
                             <div className="app-brand">
-                                <span className="app-brand-mark">🚛</span>
+                                <span className="app-brand-mark">{React.createElement(icons.CarOutlined)}</span>
                                 <div>
                                     <div className="app-brand-title">派车表</div>
                                     <div className="app-brand-sub">DISPATCH</div>
@@ -3200,8 +3201,8 @@
                                 ))}
                             </nav>
                             <div className="app-side-foot">
-                                <Button block className="side-btn" onClick={handleBackup}>📤 备份数据</Button>
-                                <Button block className="side-btn" onClick={() => document.getElementById('import-input').click()}>📥 恢复数据</Button>
+                                <Button block className="side-btn" onClick={handleBackup} icon={React.createElement(icons.CloudDownloadOutlined)}>备份数据</Button>
+                                <Button block className="side-btn" onClick={() => document.getElementById('import-input').click()} icon={React.createElement(icons.CloudUploadOutlined)}>恢复数据</Button>
                                 <input 
                                     type="file" 
                                     id="import-input" 
