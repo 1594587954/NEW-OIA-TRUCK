@@ -516,6 +516,19 @@
                 .filter(Boolean)
                 .join('-');
 
+            // 合并站点地址的「默认备注」到备注栏（去重，不动其它内容）
+            const mergeAddressNotes = (baseNote, stopsList) => {
+                let text = (baseNote || '').trim();
+                (stopsList || []).forEach(s => {
+                    const a = addresses.find(x => x.id === s.addressId);
+                    const n = a && a.note ? String(a.note).trim() : '';
+                    if (n && text.indexOf(n) < 0) {
+                        text = text ? (text + '\n' + n) : n;
+                    }
+                });
+                return text;
+            };
+
             useEffect(() => {
                 if (!routeNameAutoRef.current) return;
                 form.setFieldsValue({ routeName: buildStopsRouteName(currentStops) });
@@ -595,11 +608,12 @@
                     // 选了线路模板：用模板名，停止按站点自动生成
                     routeNameAutoRef.current = false;
                     form.setFieldsValue({ routeName: route.name || '' });
-                    setCurrentStops(route.stops.map((s, i) => ({ 
+                    const mappedStops = route.stops.map((s, i) => ({ 
                         key: Date.now() + i, 
                         addressId: s.addressId,
                         type: s.type || (i === 0 ? 'pickup' : (i === route.stops.length - 1 ? 'delivery' : 'logistics'))
-                    })));
+                    }));
+                    setCurrentStops(mappedStops);
                     
                     // 自动填充表单
                     const currentValues = form.getFieldsValue();
@@ -608,7 +622,7 @@
                         cargoCount: route.cargo?.count,
                         cargoCbm: route.cargo?.cbm,
                         cargoWeight: route.cargo?.weight,
-                        note: route.cargo?.note,
+                        note: mergeAddressNotes(route.cargo?.note, mappedStops),
                         fleet: currentValues.fleet || route.fleet,
                         vehicleType: currentValues.vehicleType || route.vehicleType
                     };
@@ -618,6 +632,10 @@
                     }
 
                     form.setFieldsValue(updates);
+
+                    if ((updates.note || '') !== (route.cargo?.note || '')) {
+                        message.info('已自动带出站点默认备注');
+                    }
 
                     if (typeof route.transitDays === 'number' && currentValues.pickupDate) {
                         message.success(`已自动加载线路信息，并根据时效(+${route.transitDays}天)设置送货日期`);
