@@ -498,12 +498,11 @@
         // --- 组件定义 ---
 
         // 4. 派车单生成组件 (新增)
-        const DispatchGenerator = ({ routes, addresses, setAddresses, editingOrder, onOrderComplete, onCancelEdit }) => {
+        const DispatchGenerator = ({ routes, addresses, setAddresses, setPrintData, editingOrder, onOrderComplete, onCancelEdit }) => {
             const [form] = Form.useForm();
             const [selectedRoute, setSelectedRoute] = useState(null);
             const [currentStops, setCurrentStops] = useState([]);
             const [draggedIndex, setDraggedIndex] = useState(null);
-            const [printData, setPrintData] = useState(null);
             const [fleets, setFleets] = useState([]);
             const [isPreOrder, setIsPreOrder] = useState(false);
             // true 表示提醒日期仍由提货日期自动推算；用户手动改过后置 false
@@ -1005,11 +1004,6 @@
                             <div className="page-sub">选择线路与单据类型，填写货物、站点信息，生成可打印派车单</div>
                         </div>
                     </div>
-                    {/* 打印内容挂载 */}
-                    {printData && ReactDOM.createPortal(
-                        <DispatchSheetPrint data={printData} addresses={addresses} />,
-                        document.getElementById('print-root')
-                    )}
 
                     <Card bordered={false} style={{ marginBottom: 24, boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
                         <div className="sec-h"><span className="si">{React.createElement(icons.ProfileOutlined)}</span>线路与单据信息</div>
@@ -2263,9 +2257,8 @@
 
 
         // 5. 订单记录管理组件 (新增)
-        const OrderManagement = ({ addresses, onEditOrder, highlightedOrderId }) => {
+        const OrderManagement = ({ addresses, onEditOrder, highlightedOrderId, setPrintData }) => {
             const [orders, setOrders] = React.useState([]);
-            const [printData, setPrintData] = React.useState(null);
             const [viewData, setViewData] = React.useState(null); // 新增用于查看的 state
             const [searchText, setSearchText] = React.useState('');
             const [selectedRowKeys, setSelectedRowKeys] = React.useState([]);
@@ -2659,10 +2652,6 @@
                             <div className="page-sub">查看、筛选、导出与重新打印历史派车单</div>
                         </div>
                     </div>
-                    {printData && ReactDOM.createPortal(
-                        <DispatchSheetPrint data={printData} addresses={addresses} />,
-                        document.getElementById('print-root')
-                    )}
                     
                     {/* 订单查看弹窗 */}
                     <Modal
@@ -3094,6 +3083,7 @@
             const [addresses, setAddresses] = useState([]);
             const [routes, setRoutes] = useState([]);
             const [activeTab, setActiveTab] = useState('0');
+            const [printData, setPrintData] = useState(null); // 打印内容（App 级，避免切 Tab 时被卸载）
             const [editingRoute, setEditingRoute] = useState(null);
             const [editingOrder, setEditingOrder] = useState(null);
             const [highlightedOrderId, setHighlightedOrderId] = useState(null);
@@ -3213,6 +3203,7 @@
                         routes={routes} 
                         addresses={addresses} 
                         setAddresses={setAddresses}
+                        setPrintData={setPrintData}
                         editingOrder={editingOrder}
                         onOrderComplete={handleOrderComplete}
                         onCancelEdit={handleCancelEdit}
@@ -3225,6 +3216,7 @@
                         addresses={addresses}
                         onEditOrder={handleEditOrder}
                         highlightedOrderId={highlightedOrderId}
+                        setPrintData={setPrintData}
                     />,
                 },
                 {
@@ -3272,6 +3264,11 @@
                         },
                     }}
                 >
+                    {/* 打印内容统一挂在 App 层：切 Tab / 组件卸载都不会把打印内容带走 */}
+                    {printData && ReactDOM.createPortal(
+                        <DispatchSheetPrint data={printData} addresses={addresses} />,
+                        document.getElementById('print-root')
+                    )}
                     <div className="app-shell">
                         <aside className="app-side">
                             <div className="app-brand">
